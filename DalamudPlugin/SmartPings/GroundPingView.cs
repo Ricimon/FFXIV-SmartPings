@@ -1,6 +1,7 @@
 ﻿using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
+using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using ImGuiNET;
 using SmartPings.Extensions;
@@ -101,13 +102,17 @@ public class GroundPingView : IPluginUIView, IDisposable
 
         this.keyStateWrapper.OnKeyDown += key =>
         {
-            if (key == this.configuration.PingKeybind && this.IsAnyPingEnabled)
+            unsafe
             {
-                cursorIsPing = true;
-            }
-            else if (key == Dalamud.Game.ClientState.Keys.VirtualKey.ESCAPE)
-            {
-                cursorIsPing = false;
+                var vanillaTextInputActive = RaptureAtkModule.Instance()->AtkModule.IsTextInputActive();
+                if (key == this.configuration.PingKeybind && this.IsAnyPingEnabled && !vanillaTextInputActive)
+                {
+                    cursorIsPing = true;
+                }
+                else if (key == Dalamud.Game.ClientState.Keys.VirtualKey.ESCAPE)
+                {
+                    cursorIsPing = false;
+                }
             }
         };
 
@@ -135,7 +140,7 @@ public class GroundPingView : IPluginUIView, IDisposable
                 pingWheelActive = false;
             }
 
-            if (args.Key == WindowsInput.Events.KeyCode.RButton)
+            else if (args.Key == WindowsInput.Events.KeyCode.RButton)
             {
                 cursorIsPing = false;
             }

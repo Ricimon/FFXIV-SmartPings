@@ -171,6 +171,7 @@ public class MainWindowPresenter(
                 for (var i = 0; i < AgentHUD.Instance()->PartyMemberCount; i++)
                 {
                     var partyMember = AgentHUD.Instance()->PartyMembers[i];
+                    if (partyMember.Object == null) { continue; }
                     // These include Other statuses
                     // These seem randomly sorted, but statuses with the same PartyListPriority are
                     // sorted relative to each other

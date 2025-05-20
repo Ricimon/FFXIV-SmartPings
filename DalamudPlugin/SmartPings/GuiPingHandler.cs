@@ -342,6 +342,7 @@ public unsafe class GuiPingHandler
                     if (partyMemberIndex < AgentHUD.Instance()->PartyMemberCount)
                     {
                         var partyMember = AgentHUD.Instance()->PartyMembers[partyMemberIndex];
+                        if (partyMember.Object == null) { break; }
                         var statuses = partyMember.Object->StatusManager.Status;
                         if (TryGetStatus(statuses, StatusType.PartyListStatus, hudElement.Index, out info.Status))
                         {
@@ -371,6 +372,7 @@ public unsafe class GuiPingHandler
                     if (partyMemberIndex < AgentHUD.Instance()->PartyMemberCount)
                     {
                         var partyMember = AgentHUD.Instance()->PartyMembers[partyMemberIndex];
+                        if (partyMember.Object == null) { break; }
                         var mousePosition = new Vector2(UIInputData.Instance()->CursorInputs.PositionX, UIInputData.Instance()->CursorInputs.PositionY);
                         // Check for HP node
                         var element = new XivHudNodeMap.HudElement(XivHudNodeMap.HudSection.PartyList1Hp + partyMemberIndex);
