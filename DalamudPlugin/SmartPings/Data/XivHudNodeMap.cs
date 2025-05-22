@@ -2,11 +2,12 @@
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using SmartPings.Log;
+using System;
 using System.Collections.Generic;
 
 namespace SmartPings.Data;
 
-public unsafe class XivHudNodeMap
+public unsafe class XivHudNodeMap : IDisposable
 {
     public enum HudSection
     {
@@ -75,6 +76,7 @@ public unsafe class XivHudNodeMap
     public IReadOnlyDictionary<HudElement, nint> ElementNodeMap => this.elementNodeMap;
 
     private readonly IGameGui gameGui;
+    private readonly IClientState clientState;
     private readonly ILogger logger;
 
     private readonly Dictionary<nint, HudElement> collisionNodeMap = [];
@@ -91,10 +93,20 @@ public unsafe class XivHudNodeMap
 
     public XivHudNodeMap(
         IGameGui gameGui,
+        IClientState clientState,
         ILogger logger)
     {
         this.gameGui = gameGui;
+        this.clientState = clientState;
         this.logger = logger;
+
+        this.clientState.Logout += OnLogout;
+    }
+
+    public void Dispose()
+    {
+        this.clientState.Logout -= OnLogout;
+        GC.SuppressFinalize(this);
     }
 
     public void Load()
@@ -289,6 +301,9 @@ public unsafe class XivHudNodeMap
         this.enfeeblementsLoaded = false;
         this.otherLoaded = false;
         this.conditionalEnhancementsLoaded = false;
+        this.partyListLoaded = false;
+        this.targetHpLoaded = false;
+        this.targetStatusLoaded = false;
     }
 
     public bool TryGetAsHudElement(nint nodeAddress, out HudElement hudElement)
@@ -328,5 +343,10 @@ public unsafe class XivHudNodeMap
         var addon = (AtkUnitBase*)this.gameGui.GetAddonByName("_StatusCustom0");
         if (addon == null) { return false; }
         return addon->Param == 512;
+    }
+
+    private void OnLogout(int type, int code)
+    {
+        Unload();
     }
 }

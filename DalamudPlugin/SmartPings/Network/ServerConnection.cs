@@ -97,11 +97,14 @@ public class ServerConnection : IDisposable
             logger.Warn("Could not load config file at {0}", configPath);
             this.loadConfig = new();
         }
+
+        this.clientState.Logout += OnLogout;
     }
 
     public void Dispose()
     {
         this.Channel?.Dispose();
+        this.clientState.Logout -= OnLogout;
         GC.SuppressFinalize(this);
     }
 
@@ -211,6 +214,11 @@ public class ServerConnection : IDisposable
         });
     }
 
+    private void OnLogout(int type, int code)
+    {
+        LeaveRoom(false);
+    }
+
     private IEnumerable<string> GetOtherPlayerNamesInInstance()
     {
         return this.objectTable.GetPlayers()
@@ -247,12 +255,19 @@ public class ServerConnection : IDisposable
         this.localPlayerFullName = playerName;
 
         this.logger.Trace("Creating ServerConnectionChannel class with peerId {0}", playerName);
-        this.Channel ??= new ServerConnectionChannel(playerName,
-            PeerType,
-            this.loadConfig.serverUrl,
-            this.loadConfig.serverToken,
-            this.logger,
-            true);
+        if (this.Channel == null)
+        {
+            this.Channel = new ServerConnectionChannel(playerName,
+                PeerType,
+                this.loadConfig.serverUrl,
+                this.loadConfig.serverToken,
+                this.logger,
+                true);
+        }
+        else
+        {
+            this.Channel.PeerId = playerName;
+        }
 
         this.Channel.OnMessage += OnMessage;
 

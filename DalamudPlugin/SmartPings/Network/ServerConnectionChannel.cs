@@ -18,7 +18,7 @@ public class ServerConnectionChannel : IDisposable
     // would crash the game. So, intermediate field booleans are now used to indicate state to the UI.
     public bool Connected => this.socket != null && !this.connecting && this.disconnectCts != null && !this.disconnectCts.IsCancellationRequested;
     public bool Connecting => this.socket != null && this.connecting && this.disconnectCts != null && !this.disconnectCts.IsCancellationRequested;
-    public string PeerId { get; }
+    public string PeerId { get; set; }
     public string PeerType { get; }
     public string ServerUrl { get; }
     public string Token { get; }
