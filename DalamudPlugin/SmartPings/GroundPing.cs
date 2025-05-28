@@ -9,6 +9,7 @@ public class GroundPing
         None = 0,
         Basic = 1,
         Question = 2,
+        Danger = 3,
     }
 
     public Type PingType;
