@@ -1,4 +1,9 @@
-﻿using Dalamud.Game.Text;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
+using System.Text;
+using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Plugin.Services;
@@ -12,11 +17,6 @@ using SmartPings.Data;
 using SmartPings.Extensions;
 using SmartPings.Log;
 using SmartPings.Network;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
-using System.Text;
 
 namespace SmartPings;
 
@@ -60,6 +60,17 @@ public unsafe class GuiPingHandler
         this.serverConnection = serverConnection;
         this.configuration = configuration;
         this.logger = logger;
+    }
+
+    public static BattleChara* GetLocalPlayer()
+    {
+        // Accessing IClientState in a non-framework thread will crash XivAlexander, so this is a
+        // different way of getting the local player
+        if (0 < AgentHUD.Instance()->PartyMemberCount)
+        {
+            return AgentHUD.Instance()->PartyMembers[0].Object;
+        }
+        return default;
     }
 
     public static string GetLocalPlayerName()
@@ -118,14 +129,19 @@ public unsafe class GuiPingHandler
 
             if (info.ElementType == HudElementInfo.Type.Status)
             {
+                var isRealStatus = info.Status.Id > 0;
+
                 // Status name --------------
-                echoMsg.AddStatusLink(info.Status.Id);
-                // This is how status links are normally constructed
-                echoMsg.AddUiForeground(500);
-                echoMsg.AddUiGlow(501);
-                echoMsg.Append(SeIconChar.LinkMarker.ToIconString());
-                echoMsg.AddUiGlowOff();
-                echoMsg.AddUiForegroundOff();
+                if (isRealStatus)
+                {
+                    echoMsg.AddStatusLink(info.Status.Id);
+                    // This is how status links are normally constructed
+                    echoMsg.AddUiForeground(500);
+                    echoMsg.AddUiGlow(501);
+                    echoMsg.Append(SeIconChar.LinkMarker.ToIconString());
+                    echoMsg.AddUiGlowOff();
+                    echoMsg.AddUiForegroundOff();
+                }
                 if (info.Status.IsEnfeeblement)
                 {
                     echoMsg.AddUiForeground(518);
@@ -140,9 +156,9 @@ public unsafe class GuiPingHandler
                 }
                 var beneficial = info.IsOnHostile == info.Status.IsEnfeeblement;
                 echoMsg.AddUiForeground($"{info.Status.Name}", beneficial ? YELLOW : RED);
-                echoMsg.Append([RawPayload.LinkTerminator]);
+                if (isRealStatus) { echoMsg.Append([RawPayload.LinkTerminator]); }
 
-                chatMsg.Append("<status>");
+                chatMsg.Append(isRealStatus ? "<status>" : info.Status.Name);
 
                 if (info.Status.MaxStacks > 0)
                 {
@@ -520,7 +536,7 @@ public unsafe class GuiPingHandler
             this.statuses.Add(statusInfo);
         }
 
-        IOrderedEnumerable<Status> sortedStatuses;
+        IEnumerable<Status> sortedStatuses;
         if (type == StatusType.TargetStatus)
         {
             sortedStatuses = this.statuses.OrderByDescending(s => s.SourceIsSelf)
@@ -531,11 +547,38 @@ public unsafe class GuiPingHandler
             sortedStatuses = this.statuses.OrderByDescending(s => s.PartyListPriority);
             if (isOwnEnhancementsPrioritized && type == StatusType.SelfEnhancement)
             {
-                sortedStatuses = sortedStatuses.ThenByDescending(s => s.SourceIsSelf);
+                sortedStatuses = ((IOrderedEnumerable<Status>)sortedStatuses).ThenByDescending(s => s.SourceIsSelf);
             }
             if (isOthersEnhancementsDisplayedInOthers && type == StatusType.SelfOther)
             {
-                sortedStatuses = sortedStatuses.ThenBy(s => s.IsOther);
+                sortedStatuses = ((IOrderedEnumerable<Status>)sortedStatuses).ThenBy(s => s.IsOther);
+            }
+        }
+
+        if (type == StatusType.SelfOther)
+        {
+            var localPlayer = GetLocalPlayer();
+            if (localPlayer != null)
+            {
+                // These are fake statuses but still appear in the UI
+                if (localPlayer->IsMounted())
+                {
+                    sortedStatuses = sortedStatuses.Prepend(new Status
+                    {
+                        Name = "Mounted",
+                        StatusCategory = 1,
+                        CanIncreaseRewards = 1
+                    });
+                }
+                else if (localPlayer->OrnamentData.OrnamentId > 0)
+                {
+                    sortedStatuses = sortedStatuses.Prepend(new Status
+                    {
+                        Name = "Accessory in use",
+                        StatusCategory = 1,
+                        CanIncreaseRewards = 1
+                    });
+                }
             }
         }
 

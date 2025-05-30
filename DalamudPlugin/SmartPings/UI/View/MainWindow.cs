@@ -78,6 +78,7 @@ public class MainWindow : Window, IPluginUIView, IDisposable
     private readonly MapManager mapChangeHandler;
     private readonly Configuration configuration;
     private readonly IClientState clientState;
+    private readonly ILogger logger;
 
     private readonly string[] groundPingTypes;
     private readonly string[] xivChatSendLocations;
@@ -96,7 +97,8 @@ public class MainWindow : Window, IPluginUIView, IDisposable
         ServerConnection serverConnection,
         MapManager mapChangeHandler,
         Configuration configuration,
-        IClientState clientState) : base(
+        IClientState clientState,
+        ILogger logger) : base(
         PluginInitializer.Name)
     {
         this.windowSystem = windowSystem;
@@ -106,6 +108,7 @@ public class MainWindow : Window, IPluginUIView, IDisposable
         this.mapChangeHandler = mapChangeHandler;
         this.configuration = configuration;
         this.clientState = clientState;
+        this.logger = logger;
         this.groundPingTypes = Enum.GetNames<GroundPing.Type>();
         this.xivChatSendLocations = Enum.GetNames<XivChatSendLocation>();
         this.falloffTypes = Enum.GetNames<AudioFalloffModel.FalloffType>();
