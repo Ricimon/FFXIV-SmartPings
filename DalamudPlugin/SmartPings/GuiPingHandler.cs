@@ -438,7 +438,8 @@ public unsafe class GuiPingHandler
                 }
                 break;
 
-            case XivHudNodeMap.HudSection.TargetStatus:
+            case XivHudNodeMap.HudSection.TargetStatus1:
+            case XivHudNodeMap.HudSection.TargetStatus2:
                 {
                     var targetId = AgentHUD.Instance()->CurrentTargetId;
                     var target = CharacterManager.Instance()->LookupBattleCharaByEntityId(targetId);

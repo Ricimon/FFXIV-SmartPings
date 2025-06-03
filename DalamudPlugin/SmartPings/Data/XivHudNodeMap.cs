@@ -19,8 +19,9 @@ public unsafe class XivHudNodeMap : IDisposable
         StatusOther = 3,
         StatusConditionalEnhancements = 4,
 
-        TargetStatus = 10,
-        TargetHp = 11,
+        TargetStatus1 = 10, // when target statuses are not separated from the HP bar
+        TargetStatus2 = 11, // when target statuses are separated from the HP bar
+        TargetHp = 12,
         FocusTargetStatus = 15,
         FocusTargetHp = 16,
 
@@ -89,7 +90,8 @@ public unsafe class XivHudNodeMap : IDisposable
     private bool conditionalEnhancementsLoaded;
     private bool partyListLoaded;
     private bool targetHpLoaded;
-    private bool targetStatusLoaded;
+    private bool targetStatus1Loaded;
+    private bool targetStatus2Loaded;
 
     public XivHudNodeMap(
         IGameGui gameGui,
@@ -272,8 +274,28 @@ public unsafe class XivHudNodeMap : IDisposable
             this.targetHpLoaded = true;
         }
 
-        // Target Statuses
-        if (!this.targetStatusLoaded)
+        // Target 1 Statuses
+        if (!this.targetStatus1Loaded)
+        {
+            var targetInfo = (AtkUnitBase*)this.gameGui.GetAddonByName("_TargetInfo");
+            if (targetInfo == null)
+            {
+                this.logger.Error("Could not load _TargetInfo addon.");
+                Unload();
+                return;
+            }
+            for (uint i = 24; i <= 53; i++)
+            {
+                var componentNode = targetInfo->GetComponentByNodeId(i);
+                if (componentNode == null || componentNode->AtkResNode == null) { continue; }
+                this.collisionNodeMap.TryAdd((nint)componentNode->AtkResNode,
+                    new(HudSection.TargetStatus1, i - 24));
+            }
+            this.targetStatus1Loaded = true;
+        }
+
+        // Target 2 Statuses
+        if (!this.targetStatus2Loaded)
         {
             var targetInfoBuffDebuff = (AtkUnitBase*)this.gameGui.GetAddonByName("_TargetInfoBuffDebuff");
             if (targetInfoBuffDebuff == null)
@@ -287,9 +309,9 @@ public unsafe class XivHudNodeMap : IDisposable
                 var componentNode = targetInfoBuffDebuff->GetComponentByNodeId(i);
                 if (componentNode == null || componentNode->AtkResNode == null) { continue; }
                 this.collisionNodeMap.TryAdd((nint)componentNode->AtkResNode,
-                    new(HudSection.TargetStatus, i - 3));
+                    new(HudSection.TargetStatus2, i - 3));
             }
-            this.targetStatusLoaded = true;
+            this.targetStatus2Loaded = true;
         }
     }
 
@@ -303,7 +325,8 @@ public unsafe class XivHudNodeMap : IDisposable
         this.conditionalEnhancementsLoaded = false;
         this.partyListLoaded = false;
         this.targetHpLoaded = false;
-        this.targetStatusLoaded = false;
+        this.targetStatus1Loaded = false;
+        this.targetStatus2Loaded = false;
     }
 
     public bool TryGetAsHudElement(nint nodeAddress, out HudElement hudElement)
