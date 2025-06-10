@@ -487,7 +487,7 @@ public unsafe class GuiPingHandler
             if (!luminaStatuses.TryGetRow(s.StatusId, out var luminaStatus)) { continue; }
             var statusInfo = new Status(luminaStatus)
             {
-                SourceIsSelf = s.SourceId == localPlayerId,
+                SourceIsSelf = s.SourceObject.ObjectId == localPlayerId,
                 Stacks = s.Param,
             };
 

@@ -184,7 +184,7 @@ public class MainWindowPresenter(
                         {
                             status = new Status(luminaStatus)
                             {
-                                SourceIsSelf = characterStatus.SourceId == GuiPingHandler.GetLocalPlayerId(),
+                                SourceIsSelf = characterStatus.SourceObject.ObjectId == GuiPingHandler.GetLocalPlayerId(),
                                 Stacks = characterStatus.Param,
                             };
                         }
@@ -212,7 +212,7 @@ public class MainWindowPresenter(
                         {
                             status = new Status(luminaStatus)
                             {
-                                SourceIsSelf = targetStatus.SourceId == GuiPingHandler.GetLocalPlayerId(),
+                                SourceIsSelf = targetStatus.SourceObject.ObjectId == GuiPingHandler.GetLocalPlayerId(),
                                 Stacks = targetStatus.Param,
                             };
                         }

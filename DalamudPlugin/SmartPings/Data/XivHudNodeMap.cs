@@ -88,7 +88,6 @@ public unsafe class XivHudNodeMap : IDisposable
     private bool enfeeblementsLoaded;
     private bool otherLoaded;
     private bool conditionalEnhancementsLoaded;
-    private bool partyListLoaded;
     private bool targetHpLoaded;
     private bool targetStatus1Loaded;
     private bool targetStatus2Loaded;
@@ -230,27 +229,23 @@ public unsafe class XivHudNodeMap : IDisposable
                 j++;
             }
 
-            if (!this.partyListLoaded)
+            // The party list HP and MP nodes also are prone to changing
+            var partyCollisionNode = partyMember.PartyMemberComponent->UldManager.RootNode;
+            if (partyCollisionNode != null)
             {
-                var partyCollisionNode = partyMember.PartyMemberComponent->UldManager.RootNode;
-                if (partyCollisionNode != null)
-                {
-                    this.collisionNodeMap.TryAdd((nint)partyCollisionNode,
-                        new(HudSection.PartyList1CollisionNode + i));
-                }
-                if (partyMember.HPGaugeBar != null && partyMember.HPGaugeBar->OwnerNode != null)
-                {
-                    this.elementNodeMap.TryAdd(new(HudSection.PartyList1Hp + i),
-                    (nint)partyMember.HPGaugeBar->OwnerNode);
-                }
-                if (partyMember.MPGaugeBar != null && partyMember.MPGaugeBar->OwnerNode != null)
-                {
-                    this.elementNodeMap.TryAdd(new(HudSection.PartyList1Mp + i),
-                    (nint)partyMember.MPGaugeBar->OwnerNode);
-                }
+                var nodePtr = (nint)partyCollisionNode;
+                this.collisionNodeMap.TryAdd(nodePtr, new(HudSection.PartyList1CollisionNode + i));
+                this.partyListStatusNodes.Add(nodePtr);
+            }
+            if (partyMember.HPGaugeBar != null && partyMember.HPGaugeBar->OwnerNode != null)
+            {
+                this.elementNodeMap[new(HudSection.PartyList1Hp + i)] = (nint)partyMember.HPGaugeBar->OwnerNode;
+            }
+            if (partyMember.MPGaugeBar != null && partyMember.MPGaugeBar->OwnerNode != null)
+            {
+                this.elementNodeMap[new(HudSection.PartyList1Mp + i)] = (nint)partyMember.MPGaugeBar->OwnerNode;
             }
         }
-        this.partyListLoaded = true;
 
         // Target HP
         if (!this.targetHpLoaded)
@@ -323,7 +318,6 @@ public unsafe class XivHudNodeMap : IDisposable
         this.enfeeblementsLoaded = false;
         this.otherLoaded = false;
         this.conditionalEnhancementsLoaded = false;
-        this.partyListLoaded = false;
         this.targetHpLoaded = false;
         this.targetStatus1Loaded = false;
         this.targetStatus2Loaded = false;
