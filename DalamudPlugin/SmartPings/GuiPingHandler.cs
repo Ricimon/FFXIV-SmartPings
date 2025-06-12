@@ -543,17 +543,19 @@ public unsafe class GuiPingHandler
             sortedStatuses = this.statuses.OrderByDescending(s => s.SourceIsSelf)
                 .ThenByDescending(s => s.PartyListPriority);
         }
+        else if (type == StatusType.SelfEnhancement && isOwnEnhancementsPrioritized)
+        {
+            sortedStatuses = this.statuses.OrderByDescending(s => s.SourceIsSelf)
+                .ThenByDescending(s => s.PartyListPriority);
+        }
+        else if (type == StatusType.SelfOther && isOthersEnhancementsDisplayedInOthers)
+        {
+            sortedStatuses = this.statuses.OrderByDescending(s => s.PartyListPriority)
+                .ThenBy(s => s.IsOther);
+        }
         else
         {
             sortedStatuses = this.statuses.OrderByDescending(s => s.PartyListPriority);
-            if (isOwnEnhancementsPrioritized && type == StatusType.SelfEnhancement)
-            {
-                sortedStatuses = ((IOrderedEnumerable<Status>)sortedStatuses).ThenByDescending(s => s.SourceIsSelf);
-            }
-            if (isOthersEnhancementsDisplayedInOthers && type == StatusType.SelfOther)
-            {
-                sortedStatuses = ((IOrderedEnumerable<Status>)sortedStatuses).ThenBy(s => s.IsOther);
-            }
         }
 
         if (type == StatusType.SelfOther)
