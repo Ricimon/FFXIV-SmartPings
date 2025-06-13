@@ -352,14 +352,14 @@ public unsafe class XivHudNodeMap : IDisposable
     {
         var addon = (AtkUnitBase*)this.gameGui.GetAddonByName("_StatusCustom0");
         if (addon == null) { return false; }
-        return addon->Param == 256;
+        return (addon->Param & 256) != 0;
     }
 
     public bool IsOthersEnhancementsDisplayedInOthers()
     {
         var addon = (AtkUnitBase*)this.gameGui.GetAddonByName("_StatusCustom0");
         if (addon == null) { return false; }
-        return addon->Param == 512;
+        return (addon->Param & 512) != 0;
     }
 
     private void OnLogout(int type, int code)

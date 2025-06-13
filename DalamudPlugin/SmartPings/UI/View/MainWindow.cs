@@ -500,31 +500,6 @@ public class MainWindow : Window, IPluginUIView, IDisposable
                 }
             }
         }
-
-#if DEBUG
-        ImGui.Dummy(new Vector2(0.0f, 5.0f)); // ---------------
-
-        ImGui.Text("DEBUG");
-        if (ImGui.Button("Print Node Map 1"))
-        {
-            this.printNodeMap1.OnNext(Unit.Default);
-        }
-        ImGui.SameLine();
-        if (ImGui.Button("Print Node Map 2"))
-        {
-            this.printNodeMap2.OnNext(Unit.Default);
-        }
-
-        if (ImGui.Button("Print Party Statuses"))
-        {
-            this.printPartyStatuses.OnNext(Unit.Default);
-        }
-        ImGui.SameLine();
-        if (ImGui.Button("Print Target Statuses"))
-        {
-            this.printTargetStatuses.OnNext(Unit.Default);
-        }
-#endif
     }
 
     private void DrawMiscTab()
@@ -587,6 +562,29 @@ public class MainWindow : Window, IPluginUIView, IDisposable
             Process.Start(new ProcessStartInfo { FileName = "https://ko-fi.com/ricimon", UseShellExecute = true });
         }
         ImGui.PopStyleColor(3);
+
+        ImGui.Dummy(new Vector2(0.0f, 5.0f)); // ---------------
+
+        ImGui.Text("DEBUG");
+        if (ImGui.Button("Print Node Map 1"))
+        {
+            this.printNodeMap1.OnNext(Unit.Default);
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Print Node Map 2"))
+        {
+            this.printNodeMap2.OnNext(Unit.Default);
+        }
+
+        if (ImGui.Button("Print Party Statuses"))
+        {
+            this.printPartyStatuses.OnNext(Unit.Default);
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Print Target Statuses"))
+        {
+            this.printTargetStatuses.OnNext(Unit.Default);
+        }
     }
 
     private void DrawKeybindEdit(Keybind keybind, VirtualKey currentBinding, string label, string? tooltip = null)

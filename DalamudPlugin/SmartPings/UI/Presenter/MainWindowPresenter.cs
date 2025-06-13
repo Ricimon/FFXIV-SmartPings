@@ -184,6 +184,7 @@ public class MainWindowPresenter(
                         {
                             status = new Status(luminaStatus)
                             {
+                                RemainingTime = characterStatus.RemainingTime,
                                 SourceIsSelf = characterStatus.SourceObject.ObjectId == GuiPingHandler.GetLocalPlayerId(),
                                 Stacks = characterStatus.Param,
                             };
@@ -212,6 +213,7 @@ public class MainWindowPresenter(
                         {
                             status = new Status(luminaStatus)
                             {
+                                RemainingTime = targetStatus.RemainingTime,
                                 SourceIsSelf = targetStatus.SourceObject.ObjectId == GuiPingHandler.GetLocalPlayerId(),
                                 Stacks = targetStatus.Param,
                             };
