@@ -513,7 +513,7 @@ public unsafe class GuiPingHandler
 
                 case StatusType.SelfOther:
                     // Enhancements applied by others are treated as Other if the HUD config option is set
-                    if (!statusInfo.IsOther &&
+                    if (!statusInfo.IsOtherEnhancement &&
                         (!isOthersEnhancementsDisplayedInOthers || statusInfo.SourceIsSelf))
                     {
                         continue;
@@ -526,7 +526,7 @@ public unsafe class GuiPingHandler
 
                 case StatusType.PartyListStatus:
                     // Other statuses are not displayed in the party list
-                    if (statusInfo.IsOther) { continue; }
+                    if (statusInfo.IsOtherEnhancement || statusInfo.IsOtherEnfeeblement) { continue; }
                     break;
 
                 case StatusType.TargetStatus:
@@ -551,7 +551,7 @@ public unsafe class GuiPingHandler
         else if (type == StatusType.SelfOther && isOthersEnhancementsDisplayedInOthers)
         {
             sortedStatuses = this.statuses.OrderByDescending(s => s.PartyListPriority)
-                .ThenBy(s => s.IsOther);
+                .ThenBy(s => s.IsOtherEnhancement);
         }
         else
         {

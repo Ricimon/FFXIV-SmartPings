@@ -43,9 +43,10 @@ public struct Status
     public ushort Stacks;
 
     public readonly bool IsEnhancement => StatusCategory == 1 && CanIncreaseRewards == 0;
-    public readonly bool IsEnfeeblement => StatusCategory == 2;
-    public readonly bool IsOther => StatusCategory == 1 && CanIncreaseRewards == 1;
+    public readonly bool IsOtherEnhancement => StatusCategory == 1 && CanIncreaseRewards == 1;
     public readonly bool IsConditionalEnhancement => StatusCategory == 1 && CanIncreaseRewards == 2;
+    public readonly bool IsEnfeeblement => StatusCategory == 2;
+    public readonly bool IsOtherEnfeeblement => IsEnfeeblement && CanIncreaseRewards == 1;
     // Some statuses are invisible and are in the status list but are not shown in any UI
     // Class-based damage buff in Criterion (ParamEffect 31)
     // Hoofing It in Occult Crescent (Id 1778)
