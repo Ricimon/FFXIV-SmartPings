@@ -208,7 +208,7 @@ public class GroundPingView : IPluginUIView, IDisposable
                             case PingWheelSection.Left: pingType = GroundPing.Type.Question; break;
                             case PingWheelSection.Up: pingType = GroundPing.Type.Danger; break;
                             case PingWheelSection.Right: pingType = GroundPing.Type.Basic; break;
-                            case PingWheelSection.Down: pingType = GroundPing.Type.Basic; break;
+                            case PingWheelSection.Down: pingType = GroundPing.Type.Assist; break;
                         }
                     }
 
@@ -306,6 +306,9 @@ public class GroundPingView : IPluginUIView, IDisposable
                     break;
                 case GroundPing.Type.Danger:
                     pingDrawn = DrawDangerPing(ImGui.GetForegroundDrawList(), p.WorldPosition, p.DrawDuration, p.Author);
+                    break;
+                case GroundPing.Type.Assist:
+                    pingDrawn = DrawAssistPing(ImGui.GetForegroundDrawList(), p.WorldPosition, p.DrawDuration, p.Author);
                     break;
             }
 
@@ -421,6 +424,15 @@ public class GroundPingView : IPluginUIView, IDisposable
             ringPath: "danger_ping_ring_sheet.png", ringRowCount: 4, ringColCount: 8, ringTotalFrames: 31, ringTotalWidth: 2048, ringTotalHeight: 1024,
             pingPath: "danger_ping_sheet.png",      pingRowCount: 4, pingColCount: 4, pingTotalFrames: 51, pingTotalWidth: 2048, pingTotalHeight: 2048,
             pingLastFrameOfAuthorTag: 37, pingFrame0HoldFrames: 37, pingToRingSizeRatio: 0.45f, pingRingPivotOffset: new Vector2(0.05f, -0.02f), pingPivotOffset: new Vector2(0, 0.07f));
+    }
+
+    private bool DrawAssistPing(ImDrawListPtr drawList, Vector3 worldPosition, float time, string? author)
+    {
+        return DrawPing(drawList, worldPosition, scale: 0.8f, time, author,
+            minRingSize: 50, maxRingSize: 600,
+            ringPath: "assist_ping_ring_sheet.png", ringRowCount: 6, ringColCount: 8, ringTotalFrames: 45, ringTotalWidth: 2048, ringTotalHeight: 1536,
+            pingPath: "assist_ping_sheet.png",      pingRowCount: 8, pingColCount: 8, pingTotalFrames: 58, pingTotalWidth: 2048, pingTotalHeight: 2048,
+            pingLastFrameOfAuthorTag: 41, pingFrame0HoldFrames: 1, pingToRingSizeRatio: 1.0f, pingRingPivotOffset: Vector2.Zero, pingPivotOffset: new Vector2(0, 0.01f));
     }
 
     private void GetFrameUVs(int rowCount, int colCount, int totalWidth, int totalHeight, int frame, out Vector2 uv0, out Vector2 uv1)
