@@ -429,10 +429,10 @@ public class GroundPingView : IPluginUIView, IDisposable
     private bool DrawAssistPing(ImDrawListPtr drawList, Vector3 worldPosition, float time, string? author)
     {
         return DrawPing(drawList, worldPosition, scale: 0.8f, time, author,
-            minRingSize: 50, maxRingSize: 600,
+            minRingSize: 53, maxRingSize: 636,
             ringPath: "assist_ping_ring_sheet.png", ringRowCount: 6, ringColCount: 8, ringTotalFrames: 45, ringTotalWidth: 2048, ringTotalHeight: 1536,
             pingPath: "assist_ping_sheet.png",      pingRowCount: 8, pingColCount: 8, pingTotalFrames: 58, pingTotalWidth: 2048, pingTotalHeight: 2048,
-            pingLastFrameOfAuthorTag: 41, pingFrame0HoldFrames: 1, pingToRingSizeRatio: 1.0f, pingRingPivotOffset: Vector2.Zero, pingPivotOffset: new Vector2(0, 0.01f));
+            pingLastFrameOfAuthorTag: 41, pingFrame0HoldFrames: 1, pingToRingSizeRatio: 1.05f, pingRingPivotOffset: Vector2.Zero, pingPivotOffset: new Vector2(0, 0.01f));
     }
 
     private void GetFrameUVs(int rowCount, int colCount, int totalWidth, int totalHeight, int frame, out Vector2 uv0, out Vector2 uv1)
