@@ -9,8 +9,6 @@ This plugin adds networked ground and UI pings to FFXIV as a Dalamud plugin.
 ### Ground pings
 ![](images/ground_pings.gif)
 
-*More ping types will be added later*
-
 ### Networked pings
 ![](images/networked_pings.gif)
 
