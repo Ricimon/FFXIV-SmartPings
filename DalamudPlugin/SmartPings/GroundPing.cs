@@ -19,4 +19,6 @@ public class GroundPing
     public string? MapId;
     public Vector3 WorldPosition;
     public float DrawDuration;
+
+    public int SfxId;
 }

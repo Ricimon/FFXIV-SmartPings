@@ -32,7 +32,10 @@ namespace SmartPings
         public bool SendGuiPingsToXivChat { get; set; }
         public XivChatSendLocation XivChatSendLocation { get; set; } = XivChatSendLocation.Active;
 
-        public float MasterVolume { get; set; } = 2.0f;
+        public float MasterVolume { get; set; } = 1.0f;
+        public int MaxConcurrentSfx { get; set; } = 5;
+        public bool EnableSpatialization { get; set; } = true;
+        public float SpatializationMinimumDistance { get; set; } = 5.0f;
 
         public bool PlayRoomJoinAndLeaveSounds { get; set; } = true;
         public bool KeybindsRequireGameFocus { get; set; }

@@ -1,13 +1,10 @@
-﻿using AsyncAwaitBestPractices;
-using Dalamud.Game.ClientState.Objects.SubKinds;
-using Dalamud.Plugin.Services;
-using SmartPings.Extensions;
-using SmartPings.Log;
-using System;
-using System.Linq;
+﻿using System;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
+using AsyncAwaitBestPractices;
+using Dalamud.Plugin.Services;
+using SmartPings.Log;
 
 namespace SmartPings.Audio;
 
@@ -18,6 +15,7 @@ public class Spatializer : IDisposable
     private readonly IFramework framework;
     private readonly Configuration configuration;
     private readonly IAudioDeviceController audioDeviceController;
+    private readonly GroundPingPresenter groundPingPresenter;
     private readonly ILogger logger;
 
     private readonly PeriodicTimer updateTimer = new(TimeSpan.FromMilliseconds(100));
@@ -30,6 +28,7 @@ public class Spatializer : IDisposable
         IFramework framework,
         Configuration configuration,
         IAudioDeviceController audioDeviceController,
+        GroundPingPresenter groundPingPresenter,
         ILogger logger)
     {
         this.clientState = clientState;
@@ -37,7 +36,33 @@ public class Spatializer : IDisposable
         this.framework = framework;
         this.configuration = configuration;
         this.audioDeviceController = audioDeviceController;
+        this.groundPingPresenter = groundPingPresenter;
         this.logger = logger;
+    }
+
+    public void StartUpdateLoop()
+    {
+        Task.Run(async delegate
+        {
+            while (await this.updateTimer.WaitForNextTickAsync())
+            {
+                await frameworkThreadSemaphore.WaitAsync();
+                if (isDisposed)
+                {
+                    return;
+                }
+                this.framework.RunOnFrameworkThread(UpdatePingVolumes).SafeFireAndForget(ex => this.logger.Error(ex.ToString()));
+            }
+        }).SafeFireAndForget(ex => this.logger.Error(ex.ToString()));
+    }
+
+    public void UpdatePingVolume(GroundPing ping)
+    {
+        CalculateSpatialValues(ping.WorldPosition,
+            out var leftVolume, out var rightVolume, out var distance, out var volume);
+        leftVolume *= this.configuration.MasterVolume;
+        rightVolume *= this.configuration.MasterVolume;
+        this.audioDeviceController.SetSfxVolume(ping.SfxId, leftVolume, rightVolume);
     }
 
     public void Dispose()
@@ -47,9 +72,23 @@ public class Spatializer : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    private void UpdatePingVolumes()
+    {
+        try
+        {
+            foreach (var ping in this.groundPingPresenter.GroundPings)
+            {
+                UpdatePingVolume(ping);
+            }
+        }
+        finally
+        {
+            this.frameworkThreadSemaphore.Release();
+        }
+    }
+
     private void CalculateSpatialValues(
-        IPlayerCharacter otherPlayer,
-        int thisTick,
+        Vector3 position,
         out float leftVolume,
         out float rightVolume,
         out float distance,
@@ -58,7 +97,7 @@ public class Spatializer : IDisposable
         Vector3 toTarget;
         if (this.clientState.LocalPlayer != null)
         {
-            toTarget = otherPlayer.Position - this.clientState.LocalPlayer.Position;
+            toTarget = position - this.clientState.LocalPlayer.Position;
         }
         else
         {
@@ -67,9 +106,11 @@ public class Spatializer : IDisposable
         distance = toTarget.Length();
 
         volume = leftVolume = rightVolume = CalculateVolume(distance);
-        //this.logger.Debug("Player {0} is {1} units away, setting volume to {2}", peer.PeerId, distance, volume);
 
-        SpatializeVolume(volume, toTarget, out leftVolume, out rightVolume);
+        if (this.configuration.EnableSpatialization)
+        {
+            SpatializeVolume(volume, toTarget, out leftVolume, out rightVolume);
+        }
     }
 
     private float CalculateVolume(float distance)
@@ -146,8 +187,7 @@ public class Spatializer : IDisposable
         if (float.IsNaN(angle)) { angle = 0f; }
         if (sine < 0) { angle = -angle; }
 
-        //var minDistance = this.configuration.FalloffModel.MinimumDistance;
-        var minDistance = 0;
+        var minDistance = this.configuration.SpatializationMinimumDistance;
         float pan = 1;
         if (minDistance > 0 && distance < minDistance)
         {
@@ -169,86 +209,4 @@ public class Spatializer : IDisposable
             leftVolume *= 1 - pan;
         }
     }
-
-    //private void DebugStuff()
-    //{
-    //    // Debug stuff
-    //    unsafe
-    //    {
-    //        var renderingCamera = *FFXIVClientStructs.FFXIV.Client.Graphics.Scene.CameraManager.Instance()->CurrentCamera;
-    //        // renderingCamera.Rotation is always (0,0,0,1)
-    //        // renderingCamera.LookAtVector doesn't seem accurate
-    //        // renderingCamera.Vector_1 seems to only change with camera pitch (not useful)
-    //        // renderingCamera.Position = renderingCamera.Object.Position
-    //        // https://github.com/NotNite/Linkpearl/blob/main/Linkpearl/Plugin.cs
-    //        var lookAtVector = new Vector3(renderingCamera.ViewMatrix.M13, renderingCamera.ViewMatrix.M23, renderingCamera.ViewMatrix.M33);
-    //        //Matrix4x4.Decompose(renderingCamera.ViewMatrix, out var scale, out var rotation, out var position);
-    //        this.logger.Debug("PlayerPosition {0}, CameraPosition {1}, LookAtVector {2}, CameraUp {3}",
-    //            (this.clientState.LocalPlayer?.Position ?? Vector3.Zero).ToString("F2", null),
-    //            renderingCamera.Position.ToString("F2", null),  // useful
-    //            lookAtVector.ToString("F2", null),  // useful
-    //            renderingCamera.Vector_1.ToString("F2", null)); // not useful
-
-    //        var npcs = this.objectTable
-    //            .Where(go => go.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.EventNpc)
-    //            .OfType<Dalamud.Game.ClientState.Objects.Types.ICharacter>();
-    //        foreach (var npc in npcs)
-    //        {
-    //            if (npc.Name.TextValue == "Storm Squadron Sergeant")
-    //            {
-    //                var toTarget = npc.Position - this.clientState.LocalPlayer?.Position ?? Vector3.Zero;
-    //                var distance = toTarget.Length();
-    //                var volume = CalculateVolume(distance);
-
-    //                var toTargetHorizontal = Vector3.Normalize(new Vector3(toTarget.X, 0, toTarget.Z));
-    //                var cameraForwardHorizontal = Vector3.Normalize(new Vector3(lookAtVector.X, 0, lookAtVector.Z));
-    //                var dot = Vector3.Dot(toTargetHorizontal, cameraForwardHorizontal);
-    //                var cross = Vector3.Dot(Vector3.Cross(toTargetHorizontal, cameraForwardHorizontal), Vector3.UnitY);
-    //                var sine = cross;
-    //                var cosine = -dot;
-    //                var angle = MathF.Acos(cosine);
-    //                if (float.IsNaN(angle)) { angle = 0f; }
-    //                if (sine < 0) { angle = -angle; }
-
-    //                var left = volume;
-    //                var right = volume;
-    //                var minDistance = this.configuration.FalloffModel.MinimumDistance;
-    //                float pan = 1;
-    //                if (minDistance > 0 && distance < minDistance)
-    //                {
-    //                    // Linear pan dropoff
-    //                    pan = distance / minDistance;
-    //                    // Arc pan dropoff
-    //                    //var d = distance / minDistance;
-    //                    //pan = 1 - MathF.Sqrt(1 - d * d);
-    //                }
-    //                pan = Math.Abs(pan * MathF.Sin(angle));
-    //                if (angle > 0)
-    //                {
-    //                    // Left of player
-    //                    right *= 1 - pan;
-    //                }
-    //                else
-    //                {
-    //                    // Right of player
-    //                    left *= 1 - pan;
-    //                }
-
-    //                this.logger.Debug("NPC {0}, position {1}, distance {2}, calcVolume {3}, angle {4}, left {5}, right {6}",
-    //                    npc.Name,
-    //                    npc.Position.ToString("F2", null),
-    //                    distance.ToString("F2", null),
-    //                    volume.ToString("F2", null),
-    //                    double.RadiansToDegrees(angle).ToString("F2", null),
-    //                    left.ToString("F2", null),
-    //                    right.ToString("F2", null));
-
-
-    //                left *= this.configuration.MasterVolume;
-    //                right *= this.configuration.MasterVolume;
-    //                this.audioDeviceController.SetChannelVolume("testPeer1", left, right);
-    //            }
-    //        }
-    //    }
-    //}
 }

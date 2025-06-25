@@ -4,6 +4,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using ImGuiNET;
+using SmartPings.Audio;
 using SmartPings.Extensions;
 using SmartPings.Input;
 using SmartPings.Log;
@@ -40,7 +41,11 @@ public class GroundPingView : IPluginUIView, IDisposable
     private readonly KeyStateWrapper keyStateWrapper;
     private readonly Configuration configuration;
     private readonly MapManager mapManager;
+    private readonly IAudioDeviceController audioDeviceController;
+    private readonly Lazy<Spatializer> spatializer;
     private readonly ILogger logger;
+
+    private readonly CachedSound basicPingSound;
 
     private enum PingWheelSection
     {
@@ -84,6 +89,8 @@ public class GroundPingView : IPluginUIView, IDisposable
         Configuration configuration,
         MapManager mapManager,
         GuiPingHandler uiPingHandler,
+        IAudioDeviceController audioDeviceController,
+        Lazy<Spatializer> spatializer,
         ILogger logger)
     {
         this.presenter = presenter;
@@ -98,7 +105,11 @@ public class GroundPingView : IPluginUIView, IDisposable
         this.keyStateWrapper = keyStateWrapper;
         this.configuration = configuration;
         this.mapManager = mapManager;
+        this.audioDeviceController = audioDeviceController;
+        this.spatializer = spatializer;
         this.logger = logger;
+
+        this.basicPingSound = new(this.pluginInterface.GetResourcePath("basic_ping.wav"));
 
         this.keyStateWrapper.OnKeyDown += key =>
         {
@@ -333,6 +344,18 @@ public class GroundPingView : IPluginUIView, IDisposable
                 this.presenter.Value.GroundPings.Remove(pNode);
                 pNode = nextNode;
                 continue;
+            }
+
+            // SFX
+            if (p.SfxId == default)
+            {
+                switch(p.PingType)
+                {
+                    case GroundPing.Type.Basic:
+                        p.SfxId = this.audioDeviceController.PlaySfx(this.basicPingSound);
+                        this.spatializer.Value.UpdatePingVolume(p);
+                        break;
+                }
             }
 
             pNode = nextNode;

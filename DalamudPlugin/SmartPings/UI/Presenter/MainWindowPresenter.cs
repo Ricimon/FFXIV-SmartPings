@@ -1,4 +1,6 @@
-﻿using AsyncAwaitBestPractices;
+﻿using System;
+using System.Reactive.Linq;
+using AsyncAwaitBestPractices;
 using Dalamud.Game.ClientState.Keys;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
@@ -12,8 +14,6 @@ using SmartPings.Input;
 using SmartPings.Log;
 using SmartPings.Network;
 using SmartPings.UI.View;
-using System;
-using System.Reactive.Linq;
 
 namespace SmartPings.UI.Presenter;
 
@@ -81,8 +81,12 @@ public class MainWindowPresenter(
         Bind(this.view.XivChatSendLocation,
             b => { this.configuration.XivChatSendLocation = b; this.configuration.Save(); }, this.configuration.XivChatSendLocation);
 
+        Bind(this.view.SelectedAudioOutputDeviceIndex,
+            i => this.audioDeviceController.AudioPlaybackDeviceIndex = i, this.audioDeviceController.AudioPlaybackDeviceIndex);
         Bind(this.view.MasterVolume,
             f => { this.configuration.MasterVolume = f; this.configuration.Save(); }, this.configuration.MasterVolume);
+        Bind(this.view.EnableSpatialization,
+            b => { this.configuration.EnableSpatialization = b; this.configuration.Save(); }, this.configuration.EnableSpatialization);
 
         Bind(this.view.PlayRoomJoinAndLeaveSounds,
             b => { this.configuration.PlayRoomJoinAndLeaveSounds = b; this.configuration.Save(); }, this.configuration.PlayRoomJoinAndLeaveSounds);

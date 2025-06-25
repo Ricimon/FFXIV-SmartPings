@@ -4,16 +4,8 @@ using System;
 
 namespace SmartPings.Audio;
 
-public class PlaybackChannel : IDisposable
+public class PlaybackChannel
 {
+    public int Id;
     public required MonoToStereoSampleProvider MonoToStereoSampleProvider { get; set; }
-    public required BufferedWaveProvider BufferedWaveProvider { get; set; }
-    public WaveInEventArgs? LastSampleAdded { get; set; }
-    public int LastSampleAddedTimestampMs { get; set; }
-    public int BufferClearedEventTimestampMs { get; set; }
-
-    public void Dispose()
-    {
-        GC.SuppressFinalize(this);
-    }
 }
