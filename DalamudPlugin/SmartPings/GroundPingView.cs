@@ -143,6 +143,13 @@ public class GroundPingView : IPluginUIView, IDisposable
             else if (args.Key == WindowsInput.Events.KeyCode.RButton)
             {
                 cursorIsPing = false;
+                // Cancel ping wheel
+                if (pingWheelActive)
+                {
+                    pingLeftClickPosition = null;
+                    pingLeftClickHeldDuration = 0;
+                    pingWheelActive = false;
+                }
             }
         });
 
