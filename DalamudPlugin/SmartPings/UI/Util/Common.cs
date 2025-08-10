@@ -1,4 +1,5 @@
-﻿using ImGuiNET;
+﻿
+using Dalamud.Bindings.ImGui;
 
 namespace SmartPings.UI.Util; 
 

@@ -1,9 +1,9 @@
-﻿using Dalamud.Plugin;
+﻿using Dalamud.Bindings.ImGui;
+using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
-using ImGuiNET;
 using SmartPings.Audio;
 using SmartPings.Extensions;
 using SmartPings.Input;
@@ -368,13 +368,13 @@ public class GroundPingView : IPluginUIView, IDisposable
 
     private void DrawPingCursor(ImDrawListPtr drawList, Vector2 mousePosition, Vector2 size)
     {
-        var img = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath("ping_cursor.png")).GetWrapOrDefault()?.ImGuiHandle ?? default;
+        var img = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath("ping_cursor.png")).GetWrapOrDefault()?.Handle ?? default;
         drawList.AddImage(img, mousePosition - size / 2, mousePosition + size / 2);
     }
 
     private PingWheelSection DrawPingWheel(ImDrawListPtr drawList, Vector2 wheelPosition, Vector2 mousePosition)
     {
-        var img = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath("ping_wheel_sheet.png")).GetWrapOrDefault()?.ImGuiHandle ?? default;
+        var img = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath("ping_wheel_sheet.png")).GetWrapOrDefault()?.Handle ?? default;
         int rowCount = 2;
         int colCount = 3;
         int totalWidth = 1536;
@@ -513,7 +513,7 @@ public class GroundPingView : IPluginUIView, IDisposable
 
         float fps = 30;
         {
-            var imgRing = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath(ringPath)).GetWrapOrDefault()?.ImGuiHandle ?? default;
+            var imgRing = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath(ringPath)).GetWrapOrDefault()?.Handle ?? default;
 
             int frame = (int)(time * fps);
             if (frame < ringTotalFrames)
@@ -533,7 +533,7 @@ public class GroundPingView : IPluginUIView, IDisposable
         }
 
         {
-            var imgPing = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath(pingPath)).GetWrapOrDefault()?.ImGuiHandle ?? default;
+            var imgPing = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath(pingPath)).GetWrapOrDefault()?.Handle ?? default;
 
             int frame = (int)(time * fps);
             if (frame < pingTotalFrames)
