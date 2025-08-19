@@ -9,6 +9,8 @@ public class GroundPing
         None = 0,
         Basic = 1,
         Question = 2,
+        Danger = 3,
+        Assist = 4,
     }
 
     public Type PingType;
@@ -17,4 +19,6 @@ public class GroundPing
     public string? MapId;
     public Vector3 WorldPosition;
     public float DrawDuration;
+
+    public int SfxId;
 }

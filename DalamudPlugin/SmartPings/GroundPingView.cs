@@ -1,8 +1,10 @@
-﻿using Dalamud.Plugin;
+﻿using Dalamud.Bindings.ImGui;
+using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
+using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
-using ImGuiNET;
+using SmartPings.Audio;
 using SmartPings.Extensions;
 using SmartPings.Input;
 using SmartPings.Log;
@@ -39,7 +41,11 @@ public class GroundPingView : IPluginUIView, IDisposable
     private readonly KeyStateWrapper keyStateWrapper;
     private readonly Configuration configuration;
     private readonly MapManager mapManager;
+    private readonly IAudioDeviceController audioDeviceController;
+    private readonly Lazy<Spatializer> spatializer;
     private readonly ILogger logger;
+
+    private readonly CachedSound basicPingSound;
 
     private enum PingWheelSection
     {
@@ -83,6 +89,8 @@ public class GroundPingView : IPluginUIView, IDisposable
         Configuration configuration,
         MapManager mapManager,
         GuiPingHandler uiPingHandler,
+        IAudioDeviceController audioDeviceController,
+        Lazy<Spatializer> spatializer,
         ILogger logger)
     {
         this.presenter = presenter;
@@ -97,17 +105,25 @@ public class GroundPingView : IPluginUIView, IDisposable
         this.keyStateWrapper = keyStateWrapper;
         this.configuration = configuration;
         this.mapManager = mapManager;
+        this.audioDeviceController = audioDeviceController;
+        this.spatializer = spatializer;
         this.logger = logger;
+
+        this.basicPingSound = new(this.pluginInterface.GetResourcePath("basic_ping.wav"));
 
         this.keyStateWrapper.OnKeyDown += key =>
         {
-            if (key == this.configuration.PingKeybind && this.IsAnyPingEnabled)
+            unsafe
             {
-                cursorIsPing = true;
-            }
-            else if (key == Dalamud.Game.ClientState.Keys.VirtualKey.ESCAPE)
-            {
-                cursorIsPing = false;
+                var vanillaTextInputActive = RaptureAtkModule.Instance()->AtkModule.IsTextInputActive();
+                if (key == this.configuration.PingKeybind && this.IsAnyPingEnabled && !vanillaTextInputActive)
+                {
+                    cursorIsPing = true;
+                }
+                else if (key == Dalamud.Game.ClientState.Keys.VirtualKey.ESCAPE)
+                {
+                    cursorIsPing = false;
+                }
             }
         };
 
@@ -135,9 +151,16 @@ public class GroundPingView : IPluginUIView, IDisposable
                 pingWheelActive = false;
             }
 
-            if (args.Key == WindowsInput.Events.KeyCode.RButton)
+            else if (args.Key == WindowsInput.Events.KeyCode.RButton)
             {
                 cursorIsPing = false;
+                // Cancel ping wheel
+                if (pingWheelActive)
+                {
+                    pingLeftClickPosition = null;
+                    pingLeftClickHeldDuration = 0;
+                    pingWheelActive = false;
+                }
             }
         });
 
@@ -228,9 +251,9 @@ public class GroundPingView : IPluginUIView, IDisposable
                         {
                             case PingWheelSection.Center: pingType = GroundPing.Type.None; break;
                             case PingWheelSection.Left: pingType = GroundPing.Type.Question; break;
-                            case PingWheelSection.Up: pingType = GroundPing.Type.Basic; break;
+                            case PingWheelSection.Up: pingType = GroundPing.Type.Danger; break;
                             case PingWheelSection.Right: pingType = GroundPing.Type.Basic; break;
-                            case PingWheelSection.Down: pingType = GroundPing.Type.Basic; break;
+                            case PingWheelSection.Down: pingType = GroundPing.Type.Assist; break;
                         }
                     }
 
@@ -326,6 +349,12 @@ public class GroundPingView : IPluginUIView, IDisposable
                 case GroundPing.Type.Question:
                     pingDrawn = DrawQuestionMarkPing(ImGui.GetForegroundDrawList(), p.WorldPosition, p.DrawDuration, p.Author);
                     break;
+                case GroundPing.Type.Danger:
+                    pingDrawn = DrawDangerPing(ImGui.GetForegroundDrawList(), p.WorldPosition, p.DrawDuration, p.Author);
+                    break;
+                case GroundPing.Type.Assist:
+                    pingDrawn = DrawAssistPing(ImGui.GetForegroundDrawList(), p.WorldPosition, p.DrawDuration, p.Author);
+                    break;
             }
 
             if (!pingDrawn)
@@ -344,6 +373,18 @@ public class GroundPingView : IPluginUIView, IDisposable
                 continue;
             }
 
+            // SFX
+            if (p.SfxId == default)
+            {
+                switch(p.PingType)
+                {
+                    case GroundPing.Type.Basic:
+                        p.SfxId = this.audioDeviceController.PlaySfx(this.basicPingSound);
+                        this.spatializer.Value.UpdatePingVolume(p);
+                        break;
+                }
+            }
+
             pNode = nextNode;
         }
 
@@ -354,13 +395,13 @@ public class GroundPingView : IPluginUIView, IDisposable
 
     private void DrawPingCursor(ImDrawListPtr drawList, Vector2 mousePosition, Vector2 size)
     {
-        var img = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath("ping_cursor.png")).GetWrapOrDefault()?.ImGuiHandle ?? default;
+        var img = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath("ping_cursor.png")).GetWrapOrDefault()?.Handle ?? default;
         drawList.AddImage(img, mousePosition - size / 2, mousePosition + size / 2);
     }
 
     private PingWheelSection DrawPingWheel(ImDrawListPtr drawList, Vector2 wheelPosition, Vector2 mousePosition)
     {
-        var img = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath("ping_wheel_sheet.png")).GetWrapOrDefault()?.ImGuiHandle ?? default;
+        var img = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath("ping_wheel_sheet.png")).GetWrapOrDefault()?.Handle ?? default;
         int rowCount = 2;
         int colCount = 3;
         int totalWidth = 1536;
@@ -421,16 +462,34 @@ public class GroundPingView : IPluginUIView, IDisposable
             minRingSize: 70, maxRingSize: 800,
             ringPath: "basic_ping_ring_sheet.png", ringRowCount: 5, ringColCount: 7, ringTotalFrames: 35, ringTotalWidth: 1792, ringTotalHeight: 1280,
             pingPath: "basic_ping_sheet.png",      pingRowCount: 4, pingColCount: 4, pingTotalFrames: 60, pingTotalWidth: 2048, pingTotalHeight: 2048,
-            pingLastFrameOfAuthorTag: 46, pingFrame0HoldFrames: 46, pingToRingSizeRatio: 0.5f, pingPivotOffset: Vector2.Zero);
+            pingLastFrameOfAuthorTag: 46, pingFrame0HoldFrames: 46, pingToRingSizeRatio: 0.5f, pingRingPivotOffset: Vector2.Zero, pingPivotOffset: Vector2.Zero);
     }
 
     private bool DrawQuestionMarkPing(ImDrawListPtr drawList, Vector3 worldPosition, float time, string? author)
     {
         return DrawPing(drawList, worldPosition, scale: 0.7f, time, author,
-            minRingSize: 70, maxRingSize: 800,
+            minRingSize: 50, maxRingSize: 600,
             ringPath: "question_ping_ring_sheet.png", ringRowCount: 5, ringColCount: 8, ringTotalFrames: 39, ringTotalWidth: 2048, ringTotalHeight: 1280,
             pingPath: "question_ping_sheet.png",      pingRowCount: 8, pingColCount: 8, pingTotalFrames: 58, pingTotalWidth: 2048, pingTotalHeight: 2048,
-            pingLastFrameOfAuthorTag: 41, pingFrame0HoldFrames: 1, pingToRingSizeRatio: 1.1f, pingPivotOffset: new Vector2(0, 0.05f));
+            pingLastFrameOfAuthorTag: 41, pingFrame0HoldFrames: 1, pingToRingSizeRatio: 1.1f, pingRingPivotOffset: Vector2.Zero, pingPivotOffset: new Vector2(0, 0.05f));
+    }
+
+    private bool DrawDangerPing(ImDrawListPtr drawList, Vector3 worldPosition, float time, string? author)
+    {
+        return DrawPing(drawList, worldPosition, scale: 1.2f, time, author,
+            minRingSize: 85, maxRingSize: 1050,
+            ringPath: "danger_ping_ring_sheet.png", ringRowCount: 4, ringColCount: 8, ringTotalFrames: 31, ringTotalWidth: 2048, ringTotalHeight: 1024,
+            pingPath: "danger_ping_sheet.png",      pingRowCount: 4, pingColCount: 4, pingTotalFrames: 51, pingTotalWidth: 2048, pingTotalHeight: 2048,
+            pingLastFrameOfAuthorTag: 37, pingFrame0HoldFrames: 37, pingToRingSizeRatio: 0.45f, pingRingPivotOffset: new Vector2(0.05f, -0.02f), pingPivotOffset: new Vector2(0, 0.07f));
+    }
+
+    private bool DrawAssistPing(ImDrawListPtr drawList, Vector3 worldPosition, float time, string? author)
+    {
+        return DrawPing(drawList, worldPosition, scale: 0.8f, time, author,
+            minRingSize: 53, maxRingSize: 636,
+            ringPath: "assist_ping_ring_sheet.png", ringRowCount: 6, ringColCount: 8, ringTotalFrames: 45, ringTotalWidth: 2048, ringTotalHeight: 1536,
+            pingPath: "assist_ping_sheet.png",      pingRowCount: 8, pingColCount: 8, pingTotalFrames: 58, pingTotalWidth: 2048, pingTotalHeight: 2048,
+            pingLastFrameOfAuthorTag: 41, pingFrame0HoldFrames: 1, pingToRingSizeRatio: 1.05f, pingRingPivotOffset: Vector2.Zero, pingPivotOffset: new Vector2(0, 0.01f));
     }
 
     private void GetFrameUVs(int rowCount, int colCount, int totalWidth, int totalHeight, int frame, out Vector2 uv0, out Vector2 uv1)
@@ -449,7 +508,7 @@ public class GroundPingView : IPluginUIView, IDisposable
         int minRingSize, int maxRingSize,
         string ringPath, int ringRowCount, int ringColCount, int ringTotalFrames, int ringTotalWidth, int ringTotalHeight,
         string pingPath, int pingRowCount, int pingColCount, int pingTotalFrames, int pingTotalWidth, int pingTotalHeight,
-        int pingLastFrameOfAuthorTag, int pingFrame0HoldFrames, float pingToRingSizeRatio, Vector2 pingPivotOffset)
+        int pingLastFrameOfAuthorTag, int pingFrame0HoldFrames, float pingToRingSizeRatio, Vector2 pingRingPivotOffset, Vector2 pingPivotOffset)
     {
         bool draw = false;
         var onScreen = this.gameGui.WorldToScreen(worldPosition, out var screenPosition);
@@ -481,7 +540,7 @@ public class GroundPingView : IPluginUIView, IDisposable
 
         float fps = 30;
         {
-            var imgRing = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath(ringPath)).GetWrapOrDefault()?.ImGuiHandle ?? default;
+            var imgRing = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath(ringPath)).GetWrapOrDefault()?.Handle ?? default;
 
             int frame = (int)(time * fps);
             if (frame < ringTotalFrames)
@@ -492,7 +551,8 @@ public class GroundPingView : IPluginUIView, IDisposable
 
                     var p0 = new Vector2(screenPosition.X - ringSize.X / 2, screenPosition.Y - ringSize.Y / 2);
                     var p1 = new Vector2(screenPosition.X + ringSize.X / 2, screenPosition.Y + ringSize.Y / 2);
-
+                    p0 += pingRingPivotOffset * ringSize;
+                    p1 += pingRingPivotOffset * ringSize;
                     drawList.AddImage(imgRing, p0, p1, uv0, uv1);
                 }
                 draw = true;
@@ -500,7 +560,7 @@ public class GroundPingView : IPluginUIView, IDisposable
         }
 
         {
-            var imgPing = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath(pingPath)).GetWrapOrDefault()?.ImGuiHandle ?? default;
+            var imgPing = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath(pingPath)).GetWrapOrDefault()?.Handle ?? default;
 
             int frame = (int)(time * fps);
             if (frame < pingTotalFrames)
@@ -531,7 +591,7 @@ public class GroundPingView : IPluginUIView, IDisposable
                     {
                         // TODO: Factor in Dalamud global font scale
                         //var fontSize = 20;
-                        var fontSize = Math.Clamp(0.125f * ringSize.X, 17, 30);
+                        var fontSize = Math.Clamp(0.125f * ringSize.X / scale, 17, 30);
                         var textSize = ImGui.CalcTextSize(author) * fontSize / 16;
                         var minPad = new Vector2(-5, 0);
                         drawList.AddRectFilled(screenPosition + minPad, screenPosition + textSize, Vector4Colors.Black.WithAlpha(0.6f).ToColorU32());

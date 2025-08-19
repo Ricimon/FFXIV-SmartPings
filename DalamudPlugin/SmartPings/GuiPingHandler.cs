@@ -1,4 +1,9 @@
-﻿using Dalamud.Game.Text;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
+using System.Text;
+using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Plugin.Services;
@@ -12,11 +17,6 @@ using SmartPings.Data;
 using SmartPings.Extensions;
 using SmartPings.Log;
 using SmartPings.Network;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
-using System.Text;
 
 namespace SmartPings;
 
@@ -60,6 +60,17 @@ public unsafe class GuiPingHandler
         this.serverConnection = serverConnection;
         this.configuration = configuration;
         this.logger = logger;
+    }
+
+    public static BattleChara* GetLocalPlayer()
+    {
+        // Accessing IClientState in a non-framework thread will crash XivAlexander, so this is a
+        // different way of getting the local player
+        if (0 < AgentHUD.Instance()->PartyMemberCount)
+        {
+            return AgentHUD.Instance()->PartyMembers[0].Object;
+        }
+        return default;
     }
 
     public static string GetLocalPlayerName()
@@ -118,14 +129,19 @@ public unsafe class GuiPingHandler
 
             if (info.ElementType == HudElementInfo.Type.Status)
             {
+                var isRealStatus = info.Status.Id > 0;
+
                 // Status name --------------
-                echoMsg.AddStatusLink(info.Status.Id);
-                // This is how status links are normally constructed
-                echoMsg.AddUiForeground(500);
-                echoMsg.AddUiGlow(501);
-                echoMsg.Append(SeIconChar.LinkMarker.ToIconString());
-                echoMsg.AddUiGlowOff();
-                echoMsg.AddUiForegroundOff();
+                if (isRealStatus)
+                {
+                    echoMsg.AddStatusLink(info.Status.Id);
+                    // This is how status links are normally constructed
+                    echoMsg.AddUiForeground(500);
+                    echoMsg.AddUiGlow(501);
+                    echoMsg.Append(SeIconChar.LinkMarker.ToIconString());
+                    echoMsg.AddUiGlowOff();
+                    echoMsg.AddUiForegroundOff();
+                }
                 if (info.Status.IsEnfeeblement)
                 {
                     echoMsg.AddUiForeground(518);
@@ -140,9 +156,9 @@ public unsafe class GuiPingHandler
                 }
                 var beneficial = info.IsOnHostile == info.Status.IsEnfeeblement;
                 echoMsg.AddUiForeground($"{info.Status.Name}", beneficial ? YELLOW : RED);
-                echoMsg.Append([RawPayload.LinkTerminator]);
+                if (isRealStatus) { echoMsg.Append([RawPayload.LinkTerminator]); }
 
-                chatMsg.Append("<status>");
+                chatMsg.Append(isRealStatus ? "<status>" : info.Status.Name);
 
                 if (info.Status.MaxStacks > 0)
                 {
@@ -342,6 +358,7 @@ public unsafe class GuiPingHandler
                     if (partyMemberIndex < AgentHUD.Instance()->PartyMemberCount)
                     {
                         var partyMember = AgentHUD.Instance()->PartyMembers[partyMemberIndex];
+                        if (partyMember.Object == null) { break; }
                         var statuses = partyMember.Object->StatusManager.Status;
                         if (TryGetStatus(statuses, StatusType.PartyListStatus, hudElement.Index, out info.Status))
                         {
@@ -371,6 +388,7 @@ public unsafe class GuiPingHandler
                     if (partyMemberIndex < AgentHUD.Instance()->PartyMemberCount)
                     {
                         var partyMember = AgentHUD.Instance()->PartyMembers[partyMemberIndex];
+                        if (partyMember.Object == null) { break; }
                         var mousePosition = new Vector2(UIInputData.Instance()->CursorInputs.PositionX, UIInputData.Instance()->CursorInputs.PositionY);
                         // Check for HP node
                         var element = new XivHudNodeMap.HudElement(XivHudNodeMap.HudSection.PartyList1Hp + partyMemberIndex);
@@ -420,7 +438,8 @@ public unsafe class GuiPingHandler
                 }
                 break;
 
-            case XivHudNodeMap.HudSection.TargetStatus:
+            case XivHudNodeMap.HudSection.TargetStatus1:
+            case XivHudNodeMap.HudSection.TargetStatus2:
                 {
                     var targetId = AgentHUD.Instance()->CurrentTargetId;
                     var target = CharacterManager.Instance()->LookupBattleCharaByEntityId(targetId);
@@ -468,7 +487,7 @@ public unsafe class GuiPingHandler
             if (!luminaStatuses.TryGetRow(s.StatusId, out var luminaStatus)) { continue; }
             var statusInfo = new Status(luminaStatus)
             {
-                SourceIsSelf = s.SourceId == localPlayerId,
+                SourceIsSelf = s.SourceObject.ObjectId == localPlayerId,
                 Stacks = s.Param,
             };
 
@@ -494,7 +513,7 @@ public unsafe class GuiPingHandler
 
                 case StatusType.SelfOther:
                     // Enhancements applied by others are treated as Other if the HUD config option is set
-                    if (!statusInfo.IsOther &&
+                    if (!statusInfo.IsOtherEnhancement &&
                         (!isOthersEnhancementsDisplayedInOthers || statusInfo.SourceIsSelf))
                     {
                         continue;
@@ -507,7 +526,7 @@ public unsafe class GuiPingHandler
 
                 case StatusType.PartyListStatus:
                     // Other statuses are not displayed in the party list
-                    if (statusInfo.IsOther) { continue; }
+                    if (statusInfo.IsOtherEnhancement || statusInfo.IsOtherEnfeeblement) { continue; }
                     break;
 
                 case StatusType.TargetStatus:
@@ -518,22 +537,51 @@ public unsafe class GuiPingHandler
             this.statuses.Add(statusInfo);
         }
 
-        IOrderedEnumerable<Status> sortedStatuses;
+        IEnumerable<Status> sortedStatuses;
         if (type == StatusType.TargetStatus)
         {
             sortedStatuses = this.statuses.OrderByDescending(s => s.SourceIsSelf)
                 .ThenByDescending(s => s.PartyListPriority);
         }
+        else if (type == StatusType.SelfEnhancement && isOwnEnhancementsPrioritized)
+        {
+            sortedStatuses = this.statuses.OrderByDescending(s => s.SourceIsSelf)
+                .ThenByDescending(s => s.PartyListPriority);
+        }
+        else if (type == StatusType.SelfOther && isOthersEnhancementsDisplayedInOthers)
+        {
+            sortedStatuses = this.statuses.OrderByDescending(s => s.PartyListPriority)
+                .ThenBy(s => s.IsOtherEnhancement);
+        }
         else
         {
             sortedStatuses = this.statuses.OrderByDescending(s => s.PartyListPriority);
-            if (isOwnEnhancementsPrioritized && type == StatusType.SelfEnhancement)
+        }
+
+        if (type == StatusType.SelfOther)
+        {
+            var localPlayer = GetLocalPlayer();
+            if (localPlayer != null)
             {
-                sortedStatuses = sortedStatuses.ThenByDescending(s => s.SourceIsSelf);
-            }
-            if (isOthersEnhancementsDisplayedInOthers && type == StatusType.SelfOther)
-            {
-                sortedStatuses = sortedStatuses.ThenBy(s => s.IsOther);
+                // These are fake statuses but still appear in the UI
+                if (localPlayer->IsMounted())
+                {
+                    sortedStatuses = sortedStatuses.Prepend(new Status
+                    {
+                        Name = "Mounted",
+                        StatusCategory = 1,
+                        CanIncreaseRewards = 1
+                    });
+                }
+                else if (localPlayer->OrnamentData.OrnamentId > 0)
+                {
+                    sortedStatuses = sortedStatuses.Prepend(new Status
+                    {
+                        Name = "Accessory in use",
+                        StatusCategory = 1,
+                        CanIncreaseRewards = 1
+                    });
+                }
             }
         }
 

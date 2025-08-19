@@ -10,9 +10,9 @@
       },
       "DalamudPackager": {
         "type": "Direct",
-        "requested": "[12.0.0, )",
-        "resolved": "12.0.0",
-        "contentHash": "J5TJLV3f16T/E2H2P17ClWjtfEBPpq3yxvqW46eN36JCm6wR+EaoaYkqG9Rm5sHqs3/nK/vKjWWyvEs/jhKoXw=="
+        "requested": "[13.0.0, )",
+        "resolved": "13.0.0",
+        "contentHash": "Mb3cUDSK/vDPQ8gQIeuCw03EMYrej1B4J44a1AvIJ9C759p9XeqdU9Hg4WgOmlnlPe0G7ILTD32PKSUpkQNa8w=="
       },
       "DotNet.ReproducibleBuilds": {
         "type": "Direct",
@@ -397,52 +397,6 @@
         "type": "Transitive",
         "resolved": "4.3.0",
         "contentHash": "VB5cn/7OzUfzdnC8tqAIMQciVLiq2epm2NrAm1E9OjNRyG4lVhfR61SMcLizejzQP8R8Uf/0l5qOIbUEi+RdEg=="
-      },
-      "SharpDX": {
-        "type": "Transitive",
-        "resolved": "4.2.0",
-        "contentHash": "3pv0LFMvfK/dv1qISJnn8xBeeT6R/FRvr0EV4KI2DGsL84Qlv6P7isWqxGyU0LCwlSVCJN3jgHJ4Bl0KI2PJww==",
-        "dependencies": {
-          "NETStandard.Library": "1.6.1"
-        }
-      },
-      "SharpDX.D3DCompiler": {
-        "type": "Transitive",
-        "resolved": "4.2.0",
-        "contentHash": "Rnsd6Ilp127xbXqhTit8WKFQUrXwWxqVGpglyWDNkIBCk0tWXNQEjrJpsl0KAObzyZaa33+EXAikLVt5fnd3GA==",
-        "dependencies": {
-          "NETStandard.Library": "1.6.1",
-          "SharpDX": "4.2.0"
-        }
-      },
-      "SharpDX.Direct2D1": {
-        "type": "Transitive",
-        "resolved": "4.2.0",
-        "contentHash": "Qs8LzDMaQf1u3KB8ArHu9pDv6itZ++QXs99a/bVAG+nKr0Hx5NG4mcN5vsfE0mVR2TkeHfeUm4PksRah6VUPtA==",
-        "dependencies": {
-          "NETStandard.Library": "1.6.1",
-          "SharpDX": "4.2.0",
-          "SharpDX.DXGI": "4.2.0"
-        }
-      },
-      "SharpDX.Direct3D11": {
-        "type": "Transitive",
-        "resolved": "4.2.0",
-        "contentHash": "oTm/iT5X/IIuJ8kNYP+DTC/MhBhqtRF5dbgPPFgLBdQv0BKzNTzXQQXd7SveBFjQg6hXEAJ2jGCAzNYvGFc9LA==",
-        "dependencies": {
-          "NETStandard.Library": "1.6.1",
-          "SharpDX": "4.2.0",
-          "SharpDX.DXGI": "4.2.0"
-        }
-      },
-      "SharpDX.DXGI": {
-        "type": "Transitive",
-        "resolved": "4.2.0",
-        "contentHash": "UjKqkgWc8U+SP+j3LBzFP6OB6Ntapjih7Xo+g1rLcsGbIb5KwewBrBChaUu7sil8rWoeVU/k0EJd3SMN4VqNZw==",
-        "dependencies": {
-          "NETStandard.Library": "1.6.1",
-          "SharpDX": "4.2.0"
-        }
       },
       "SocketIO.Core": {
         "type": "Transitive",
@@ -1343,14 +1297,6 @@
           "System.Text.Encoding": "4.3.0",
           "System.Threading": "4.3.0",
           "System.Xml.ReaderWriter": "4.3.0"
-        }
-      },
-      "pictomancy": {
-        "type": "Project",
-        "dependencies": {
-          "SharpDX.D3DCompiler": "[4.2.0, )",
-          "SharpDX.Direct2D1": "[4.2.0, )",
-          "SharpDX.Direct3D11": "[4.2.0, )"
         }
       }
     }

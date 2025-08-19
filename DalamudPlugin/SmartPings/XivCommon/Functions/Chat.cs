@@ -35,16 +35,42 @@ namespace ECommons.Automation;
 /// <summary>
 /// A class containing chat functionality
 /// </summary>
-public class Chat
+public unsafe class Chat
 {
-    private static class Signatures
-    {
-        internal const string SendChat = "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC 20 48 8B F2 48 8B F9 45 84 C9";
-        internal const string SanitiseString = "E8 ?? ?? ?? ?? EB 0A 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8D AE";
-    }
+    public static readonly string SendChatSignature = "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC 20 48 8B F2 48 8B F9 45 84 C9";
+    public static readonly string SanitiseStringSignature = "48 89 5C 24 ?? 55 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ?? 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 45 70 4D 8B F8 4C 89 44 24 ?? 4C 8B 05 ?? ?? ?? ?? 44 8B E2";
+
     private delegate void ProcessChatBoxDelegate(IntPtr uiModule, IntPtr message, IntPtr unused, byte a4);
     private ProcessChatBoxDelegate ProcessChatBox { get; }
-    private readonly unsafe delegate* unmanaged<Utf8String*, int, IntPtr, void> _sanitiseString = null!;
+
+    private delegate void SanitizeStringDelegate(Utf8String* stringPtr, int a2, nint a3);
+    private SanitizeStringDelegate SanitizeString { get; }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private readonly struct ChatPayload : IDisposable
+    {
+        [FieldOffset(0)]
+        private readonly IntPtr textPtr;
+        [FieldOffset(16)]
+        private readonly ulong textLen;
+        [FieldOffset(8)]
+        private readonly ulong unk1;
+        [FieldOffset(24)]
+        private readonly ulong unk2;
+        internal ChatPayload(byte[] stringBytes)
+        {
+            textPtr = Marshal.AllocHGlobal(stringBytes.Length + 30);
+            Marshal.Copy(stringBytes, 0, textPtr, stringBytes.Length);
+            Marshal.WriteByte(textPtr + stringBytes.Length, 0);
+            textLen = (ulong)(stringBytes.Length + 1);
+            unk1 = 64;
+            unk2 = 0;
+        }
+        public void Dispose()
+        {
+            Marshal.FreeHGlobal(textPtr);
+        }
+    }
 
     private readonly IDataManager dataManager;
 
@@ -52,18 +78,16 @@ public class Chat
     {
         this.dataManager = dataManager;
 
-        if(sigScanner.TryScanText(Signatures.SendChat, out var processChatBoxPtr))
+        if(sigScanner.TryScanText(SendChatSignature, out var processChatBoxPtr))
         {
             ProcessChatBox = Marshal.GetDelegateForFunctionPointer<ProcessChatBoxDelegate>(processChatBoxPtr);
         }
-        unsafe
+        if(sigScanner.TryScanText(SanitiseStringSignature, out var sanitisePtr))
         {
-            if(sigScanner.TryScanText(Signatures.SanitiseString, out var sanitisePtr))
-            {
-                _sanitiseString = (delegate* unmanaged<Utf8String*, int, IntPtr, void>)sanitisePtr;
-            }
+            SanitizeString = Marshal.GetDelegateForFunctionPointer<SanitizeStringDelegate>(sanitisePtr);
         }
     }
+
     /// <summary>
     /// <para>
     /// Send a given message to the chat box. <b>This can send chat to the server.</b>
@@ -119,6 +143,14 @@ public class Chat
         {
             throw new ArgumentException("message contained invalid characters", nameof(message));
         }
+        if(message.Contains('\n'))
+        {
+            throw new ArgumentException("message can't contain multiple lines", nameof(message));
+        }
+        if(message.Contains('\r'))
+        {
+            throw new ArgumentException("message can't contain carriage return", nameof(message));
+        }
 #pragma warning disable CS0618 // Type or member is obsolete
         SendMessageUnsafe(bytes);
 #pragma warning restore CS0618 // Type or member is obsolete
@@ -168,40 +200,15 @@ public class Chat
     /// <exception cref="InvalidOperationException">If the signature for this function could not be found</exception>
     public unsafe string SanitiseText(string text)
     {
-        if(_sanitiseString == null)
+        if(SanitizeString == null)
         {
             throw new InvalidOperationException("Could not find signature for chat sanitisation");
         }
         var uText = Utf8String.FromString(text);
-        _sanitiseString(uText, 0x27F, IntPtr.Zero);
+        SanitizeString(uText, 0x27F, IntPtr.Zero);
         var sanitised = uText->ToString();
         uText->Dtor();
         IMemorySpace.Free(uText);
         return sanitised;
-    }
-    [StructLayout(LayoutKind.Explicit)]
-    private readonly struct ChatPayload : IDisposable
-    {
-        [FieldOffset(0)]
-        private readonly IntPtr textPtr;
-        [FieldOffset(16)]
-        private readonly ulong textLen;
-        [FieldOffset(8)]
-        private readonly ulong unk1;
-        [FieldOffset(24)]
-        private readonly ulong unk2;
-        internal ChatPayload(byte[] stringBytes)
-        {
-            textPtr = Marshal.AllocHGlobal(stringBytes.Length + 30);
-            Marshal.Copy(stringBytes, 0, textPtr, stringBytes.Length);
-            Marshal.WriteByte(textPtr + stringBytes.Length, 0);
-            textLen = (ulong)(stringBytes.Length + 1);
-            unk1 = 64;
-            unk2 = 0;
-        }
-        public void Dispose()
-        {
-            Marshal.FreeHGlobal(textPtr);
-        }
     }
 }

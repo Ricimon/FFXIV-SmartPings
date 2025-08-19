@@ -1,9 +1,17 @@
-﻿using Dalamud.Game.ClientState.Keys;
+﻿using System;
+using System.Diagnostics;
+using System.Linq;
+using System.Numerics;
+using System.Reactive;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
+using System.Text;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Game.ClientState.Keys;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
-using ImGuiNET;
 using Reactive.Bindings;
 using SmartPings.Audio;
 using SmartPings.Data;
@@ -12,14 +20,6 @@ using SmartPings.Input;
 using SmartPings.Log;
 using SmartPings.Network;
 using SmartPings.UI.Util;
-using System;
-using System.Diagnostics;
-using System.Linq;
-using System.Numerics;
-using System.Reactive;
-using System.Reactive.Linq;
-using System.Reactive.Subjects;
-using System.Text;
 
 namespace SmartPings.UI.View;
 
@@ -55,6 +55,10 @@ public class MainWindow : Window, IPluginUIView, IDisposable
     public IReactiveProperty<bool> SendGuiPingsToXivChat { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<XivChatSendLocation> XivChatSendLocation { get; } = new ReactiveProperty<XivChatSendLocation>();
 
+    public IReactiveProperty<int> SelectedAudioOutputDeviceIndex { get; } = new ReactiveProperty<int>(-1);
+    public IReactiveProperty<float> MasterVolume { get; } = new ReactiveProperty<float>();
+    public IReactiveProperty<bool> EnableSpatialization { get; } = new ReactiveProperty<bool>();
+
     public IObservable<Unit> PrintNodeMap1 => printNodeMap1.AsObservable();
     private readonly Subject<Unit> printNodeMap1 = new();
     public IObservable<Unit> PrintNodeMap2 => printNodeMap2.AsObservable();
@@ -63,8 +67,6 @@ public class MainWindow : Window, IPluginUIView, IDisposable
     private readonly Subject<Unit> printPartyStatuses = new();
     public IObservable<Unit> PrintTargetStatuses => printTargetStatuses.AsObservable();
     private readonly Subject<Unit> printTargetStatuses = new();
-
-    public IReactiveProperty<float> MasterVolume { get; } = new ReactiveProperty<float>();
 
     public IReactiveProperty<bool> PlayRoomJoinAndLeaveSounds { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<bool> KeybindsRequireGameFocus { get; } = new ReactiveProperty<bool>();
@@ -78,6 +80,8 @@ public class MainWindow : Window, IPluginUIView, IDisposable
     private readonly MapManager mapChangeHandler;
     private readonly Configuration configuration;
     private readonly IClientState clientState;
+    private readonly IAudioDeviceController audioDeviceController;
+    private readonly ILogger logger;
 
     private readonly string[] groundPingTypes;
     private readonly string[] xivChatSendLocations;
@@ -96,7 +100,9 @@ public class MainWindow : Window, IPluginUIView, IDisposable
         ServerConnection serverConnection,
         MapManager mapChangeHandler,
         Configuration configuration,
-        IClientState clientState) : base(
+        IClientState clientState,
+        IAudioDeviceController audioDeviceController,
+        ILogger logger) : base(
         PluginInitializer.Name)
     {
         this.windowSystem = windowSystem;
@@ -106,6 +112,8 @@ public class MainWindow : Window, IPluginUIView, IDisposable
         this.mapChangeHandler = mapChangeHandler;
         this.configuration = configuration;
         this.clientState = clientState;
+        this.audioDeviceController = audioDeviceController;
+        this.logger = logger;
         this.groundPingTypes = Enum.GetNames<GroundPing.Type>();
         this.xivChatSendLocations = Enum.GetNames<XivChatSendLocation>();
         this.falloffTypes = Enum.GetNames<AudioFalloffModel.FalloffType>();
@@ -500,30 +508,66 @@ public class MainWindow : Window, IPluginUIView, IDisposable
             }
         }
 
-#if DEBUG
         ImGui.Dummy(new Vector2(0.0f, 5.0f)); // ---------------
 
-        ImGui.Text("DEBUG");
-        if (ImGui.Button("Print Node Map 1"))
+        ImGui.Text("Audio");
+        using (ImRaii.PushIndent())
+        using (var deviceTable = ImRaii.Table("AudioDevices", 2))
         {
-            this.printNodeMap1.OnNext(Unit.Default);
-        }
-        ImGui.SameLine();
-        if (ImGui.Button("Print Node Map 2"))
-        {
-            this.printNodeMap2.OnNext(Unit.Default);
+            if (deviceTable)
+            {
+                ImGui.TableSetupColumn("AudioDevicesCol1", ImGuiTableColumnFlags.WidthFixed, 80);
+                ImGui.TableSetupColumn("AudioDevicesCol2", ImGuiTableColumnFlags.WidthFixed, 230);
+
+                ImGui.TableNextRow(); ImGui.TableNextColumn();
+
+                ImGui.AlignTextToFramePadding();
+                ImGui.Text("Output Device"); ImGui.TableNextColumn();
+                ImGui.SetNextItemWidth(ImGui.GetColumnWidth());
+                this.outputDevices ??= [.. this.audioDeviceController.GetAudioPlaybackDevices()];
+                var outputDeviceIndex = this.SelectedAudioOutputDeviceIndex.Value + 1;
+                if (ImGui.Combo("##OutputDevice", ref outputDeviceIndex, this.outputDevices, this.outputDevices.Length))
+                {
+                    this.SelectedAudioOutputDeviceIndex.Value = outputDeviceIndex - 1;
+                }
+            }
         }
 
-        if (ImGui.Button("Print Party Statuses"))
+        using (ImRaii.PushIndent())
+        using (var volumeTable = ImRaii.Table("Volume", 2))
         {
-            this.printPartyStatuses.OnNext(Unit.Default);
+            if (volumeTable)
+            {
+                ImGui.TableSetupColumn("VolumeCol1", ImGuiTableColumnFlags.WidthFixed, 140);
+                ImGui.TableSetupColumn("VolumeCol2", ImGuiTableColumnFlags.WidthFixed, 150);
+
+                ImGui.TableNextRow(); ImGui.TableNextColumn();
+
+                ImGui.AlignTextToFramePadding();
+                ImGui.Text("Master Volume"); ImGui.TableNextColumn();
+                ImGui.SetNextItemWidth(ImGui.GetColumnWidth());
+                var masterVolume = this.MasterVolume.Value * 100.0f;
+                if (ImGui.SliderFloat("##MasterVolume", ref masterVolume, 0.0f, 200.0f, "%1.0f%%"))
+                {
+                    this.MasterVolume.Value = masterVolume / 100.0f;
+                }
+
+                ImGui.TableNextRow(); ImGui.TableNextColumn();
+                ImGui.AlignTextToFramePadding();
+                ImGui.Text("Enable Spatialization");
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip("Use camera facing direction to pan incoming audio");
+                }
+                ImGui.TableNextColumn();
+                ImGui.SetNextItemWidth(ImGui.GetColumnWidth());
+                var enableSpatialization = this.EnableSpatialization.Value;
+                if (ImGui.Checkbox("##EnableSpatialization", ref enableSpatialization))
+                {
+                    this.EnableSpatialization.Value = enableSpatialization;
+                }
+            }
         }
-        ImGui.SameLine();
-        if (ImGui.Button("Print Target Statuses"))
-        {
-            this.printTargetStatuses.OnNext(Unit.Default);
-        }
-#endif
     }
 
     private void DrawMiscTab()
@@ -586,6 +630,29 @@ public class MainWindow : Window, IPluginUIView, IDisposable
             Process.Start(new ProcessStartInfo { FileName = "https://ko-fi.com/ricimon", UseShellExecute = true });
         }
         ImGui.PopStyleColor(3);
+
+        ImGui.Dummy(new Vector2(0.0f, 5.0f)); // ---------------
+
+        ImGui.Text("DEBUG");
+        if (ImGui.Button("Print Node Map 1"))
+        {
+            this.printNodeMap1.OnNext(Unit.Default);
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Print Node Map 2"))
+        {
+            this.printNodeMap2.OnNext(Unit.Default);
+        }
+
+        if (ImGui.Button("Print Party Statuses"))
+        {
+            this.printPartyStatuses.OnNext(Unit.Default);
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Print Target Statuses"))
+        {
+            this.printTargetStatuses.OnNext(Unit.Default);
+        }
     }
 
     private void DrawKeybindEdit(Keybind keybind, VirtualKey currentBinding, string label, string? tooltip = null)

@@ -1,7 +1,4 @@
-﻿using NAudio.Wave;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
 namespace SmartPings.Audio;
 
@@ -13,19 +10,10 @@ public interface IAudioDeviceController
 
     public int AudioPlaybackDeviceIndex { get; set; }
 
-    public event EventHandler<WaveInEventArgs>? OnAudioRecordingSourceDataAvailable;
-
     IEnumerable<string> GetAudioPlaybackDevices();
 
-    void CreateAudioPlaybackChannel(string channelName);
-    void RemoveAudioPlaybackChannel(string channelName);
+    void ResetAllSfxVolume(float volume);
+    void SetSfxVolume(int id, float leftVolume, float rightVolume);
 
-    void AddPlaybackSample(string channelName, WaveInEventArgs sample);
-
-    void ResetAllChannelsVolume(float volume);
-    void SetChannelVolume(string channelName, float leftVolume, float rightVolume);
-
-    bool ChannelHasActivity(string channelName);
-
-    Task PlaySfx(CachedSound sound);
+    int PlaySfx(CachedSound sound);
 }
