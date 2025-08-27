@@ -29,7 +29,7 @@ public class PingSounds
                     { GroundPing.Type.Basic, new(dalamud.PluginInterface.GetResourcePath("lol_generic_ping.wav")) },
                     { GroundPing.Type.Question, new(dalamud.PluginInterface.GetResourcePath("lol_missing_ping.wav")) },
                     { GroundPing.Type.Danger, new(dalamud.PluginInterface.GetResourcePath("lol_retreat_ping.wav")) },
-                    { GroundPing.Type.Assist, new(dalamud.PluginInterface.GetResourcePath("lol_hold_ping.wav")) },
+                    { GroundPing.Type.Assist, new(dalamud.PluginInterface.GetResourcePath("lol_assist_ping.wav")) },
                 }
             },
         };
