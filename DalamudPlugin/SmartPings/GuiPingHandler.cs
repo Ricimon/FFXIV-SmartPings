@@ -6,7 +6,6 @@ using System.Text;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
-using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using ECommons.Automation;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
@@ -20,7 +19,13 @@ using SmartPings.Network;
 
 namespace SmartPings;
 
-public unsafe class GuiPingHandler
+public unsafe class GuiPingHandler(
+    DalamudServices dalamud,
+    Chat chat,
+    XivHudNodeMap hudNodeMap,
+    ServerConnection serverConnection,
+    Configuration configuration,
+    ILogger logger)
 {
     private const ushort BLUE = 542;
     private const ushort LIGHT_BLUE = 529;
@@ -28,39 +33,7 @@ public unsafe class GuiPingHandler
     private const ushort GREEN = 43;
     private const ushort RED = 518;
 
-    private readonly IClientState clientState;
-    private readonly IDataManager dataManager;
-    private readonly IChatGui chatGui;
-    private readonly IFramework framework;
-    private readonly Chat chat;
-    private readonly XivHudNodeMap hudNodeMap;
-    private readonly ServerConnection serverConnection;
-    private readonly Configuration configuration;
-    private readonly ILogger logger;
-
     private readonly List<Status> statuses = [];
-
-    public GuiPingHandler(
-        IClientState clientState,
-        IDataManager dataManager,
-        IChatGui chatGui,
-        IFramework framework,
-        Chat chat,
-        XivHudNodeMap hudNodeMap,
-        ServerConnection serverConnection,
-        Configuration configuration,
-        ILogger logger)
-    {
-        this.clientState = clientState;
-        this.dataManager = dataManager;
-        this.chatGui = chatGui;
-        this.framework = framework;
-        this.chat = chat;
-        this.hudNodeMap = hudNodeMap;
-        this.serverConnection = serverConnection;
-        this.configuration = configuration;
-        this.logger = logger;
-    }
 
     public static BattleChara* GetLocalPlayer()
     {
@@ -104,11 +77,11 @@ public unsafe class GuiPingHandler
         // World UI such as Nameplates have this flag
         if (collisionNode != null && collisionNode->NodeFlags.HasFlag(NodeFlags.UseDepthBasedPriority)) { return false; }
 
-        this.logger.Debug("Mouse over collision node {0} and addon {1}",
+        logger.Debug("Mouse over collision node {0} and addon {1}",
             ((nint)collisionNode).ToString("X"),
             ((nint)addon).ToString("X"));
 
-        if (!this.configuration.EnableGuiPings) { return true; }
+        if (!configuration.EnableGuiPings) { return true; }
 
         if (TryGetCollisionNodeElementInfo(collisionNode, out var info))
         {
@@ -220,33 +193,33 @@ public unsafe class GuiPingHandler
                 ImGuiExtensions.CaptureMouseThisFrame();
             }
 
-            if (this.configuration.SendGuiPingsToXivChat)
+            if (configuration.SendGuiPingsToXivChat)
             {
                 // This method must be called on a framework thread or else XIV will crash.
-                this.framework.Run(() =>
+                dalamud.Framework.Run(() =>
                 {
                     if (info.ElementType == HudElementInfo.Type.Status)
                     {
                         AgentChatLog.Instance()->ContextStatusId = info.Status.Id;
                     }
-                    if (this.configuration.XivChatSendLocation == XivChatSendLocation.Party)
+                    if (configuration.XivChatSendLocation == XivChatSendLocation.Party)
                     {
                         chatMsg.Insert(0, "/party ");
                     }
-                    this.chat.SendMessage(chatMsg.ToString());
+                    chat.SendMessage(chatMsg.ToString());
                 });
             }
 
-            if (this.configuration.SendGuiPingsToCustomServer)
+            if (configuration.SendGuiPingsToCustomServer)
             {
                 var xivMsg = new XivChatEntry
                 {
                     Type = XivChatType.Echo,
                     Message = echoMsg.Build(),
                 };
-                this.chatGui.Print(xivMsg);
+                dalamud.ChatGui.Print(xivMsg);
 
-                this.serverConnection.SendChatMessage(xivMsg);
+                serverConnection.SendChatMessage(xivMsg);
             }
         }
 
@@ -275,7 +248,7 @@ public unsafe class GuiPingHandler
         info = default;
 
         // Search for the node in our node map to determine if it's a relevant HUD element
-        if (!this.hudNodeMap.TryGetAsHudElement((nint)collisionNode, out var hudElement)) { return false; }
+        if (!hudNodeMap.TryGetAsHudElement((nint)collisionNode, out var hudElement)) { return false; }
 
         switch (hudElement.HudSection)
         {
@@ -382,7 +355,7 @@ public unsafe class GuiPingHandler
             case XivHudNodeMap.HudSection.PartyList8CollisionNode:
             case XivHudNodeMap.HudSection.PartyList9CollisionNode:
                 {
-                    if (!this.configuration.EnableHpMpPings) { break; }
+                    if (!configuration.EnableHpMpPings) { break; }
 
                     var partyMemberIndex = hudElement.HudSection - XivHudNodeMap.HudSection.PartyList1CollisionNode;
                     if (partyMemberIndex < AgentHUD.Instance()->PartyMemberCount)
@@ -392,7 +365,7 @@ public unsafe class GuiPingHandler
                         var mousePosition = new Vector2(UIInputData.Instance()->CursorInputs.PositionX, UIInputData.Instance()->CursorInputs.PositionY);
                         // Check for HP node
                         var element = new XivHudNodeMap.HudElement(XivHudNodeMap.HudSection.PartyList1Hp + partyMemberIndex);
-                        if (this.hudNodeMap.TryGetHudElementNode(element, out var hpNode) &&
+                        if (hudNodeMap.TryGetHudElementNode(element, out var hpNode) &&
                             IsPositionInNode(mousePosition, (AtkResNode*)hpNode))
                         {
                             info.ElementType = HudElementInfo.Type.Hp;
@@ -405,7 +378,7 @@ public unsafe class GuiPingHandler
                         }
                         // Check for MP node
                         element = new XivHudNodeMap.HudElement(XivHudNodeMap.HudSection.PartyList1Mp + partyMemberIndex);
-                        if (this.hudNodeMap.TryGetHudElementNode(element, out var mpNode) &&
+                        if (hudNodeMap.TryGetHudElementNode(element, out var mpNode) &&
                             IsPositionInNode(mousePosition, (AtkResNode*)mpNode))
                         {
                             info.ElementType = HudElementInfo.Type.Mp;
@@ -470,20 +443,20 @@ public unsafe class GuiPingHandler
 
         // Early out cases
         // Cannot search for a conditional enhancement if conditional enhancements are not enabled
-        if (type == StatusType.SelfConditionalEnhancement && !this.hudNodeMap.IsConditionalEnhancementsEnabled()) { return false; }
+        if (type == StatusType.SelfConditionalEnhancement && !hudNodeMap.IsConditionalEnhancementsEnabled()) { return false; }
 
         this.statuses.Clear();
 
-        var isConditionalEnhancementsEnabled = this.hudNodeMap.IsConditionalEnhancementsEnabled();
-        var isOwnEnhancementsPrioritized = this.hudNodeMap.IsOwnEnhancementsPrioritized();
-        var isOthersEnhancementsDisplayedInOthers = this.hudNodeMap.IsOthersEnhancementsDisplayedInOthers();
+        var isConditionalEnhancementsEnabled = hudNodeMap.IsConditionalEnhancementsEnabled();
+        var isOwnEnhancementsPrioritized = hudNodeMap.IsOwnEnhancementsPrioritized();
+        var isOthersEnhancementsDisplayedInOthers = hudNodeMap.IsOthersEnhancementsDisplayedInOthers();
         var localPlayerId = GetLocalPlayerId();
 
         // Fill status list with relevant statuses to sort
         foreach (var s in allStatuses)
         {
             if (s.StatusId == 0) { continue; }
-            var luminaStatuses = this.dataManager.GetExcelSheet<Lumina.Excel.Sheets.Status>(this.clientState.ClientLanguage);
+            var luminaStatuses = dalamud.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Status>(dalamud.ClientState.ClientLanguage);
             if (!luminaStatuses.TryGetRow(s.StatusId, out var luminaStatus)) { continue; }
             var statusInfo = new Status(luminaStatus)
             {

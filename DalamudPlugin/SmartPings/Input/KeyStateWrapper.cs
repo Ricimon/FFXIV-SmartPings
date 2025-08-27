@@ -1,84 +1,79 @@
-﻿using Dalamud.Game.ClientState.Keys;
-using Dalamud.Plugin.Services;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using Dalamud.Game.ClientState.Keys;
+using Dalamud.Plugin.Services;
 
 namespace SmartPings.Input;
 
-public class KeyStateWrapper : IKeyState, IDisposable
+public sealed class KeyStateWrapper : IKeyState, IDisposable
 {
     public event Action<VirtualKey>? OnKeyUp;
     public event Action<VirtualKey>? OnKeyDown;
 
-    private readonly IKeyState keyState;
-    private readonly IFramework framework;
+    private readonly DalamudServices dalamud;
 
     private readonly Dictionary<VirtualKey, bool> keyStates = [];
 
     public bool this[VirtualKey vkCode] { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
     public bool this[int vkCode] { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
-    public KeyStateWrapper(
-        IKeyState keyState,
-        IFramework framework)
+    public KeyStateWrapper(DalamudServices dalamud)
     {
-        this.keyState = keyState;
-        this.framework = framework;
+        this.dalamud = dalamud;
 
-        this.framework.Update += OnFrameworkUpdate;
+        this.dalamud.Framework.Update += OnFrameworkUpdate;
     }
 
     public int GetRawValue(int vkCode)
     {
-        return this.keyState.GetRawValue(vkCode);
+        return this.dalamud.KeyState.GetRawValue(vkCode);
     }
 
     public int GetRawValue(VirtualKey vkCode)
     {
-        return this.keyState.GetRawValue(vkCode);
+        return this.dalamud.KeyState.GetRawValue(vkCode);
     }
 
     public void SetRawValue(int vkCode, int value)
     {
-        this.keyState.SetRawValue(vkCode, value);
+        this.dalamud.KeyState.SetRawValue(vkCode, value);
     }
 
     public void SetRawValue(VirtualKey vkCode, int value)
     {
-        this.keyState.SetRawValue(vkCode, value);
+        this.dalamud.KeyState.SetRawValue(vkCode, value);
     }
 
     public bool IsVirtualKeyValid(int vkCode)
     {
-        return this.keyState.IsVirtualKeyValid(vkCode);
+        return this.dalamud.KeyState.IsVirtualKeyValid(vkCode);
     }
 
     public bool IsVirtualKeyValid(VirtualKey vkCode)
     {
-        return this.keyState.IsVirtualKeyValid(vkCode);
+        return this.dalamud.KeyState.IsVirtualKeyValid(vkCode);
     }
 
     public IEnumerable<VirtualKey> GetValidVirtualKeys()
     {
-        return this.keyState.GetValidVirtualKeys();
+        return this.dalamud.KeyState.GetValidVirtualKeys();
     }
 
     public void ClearAll()
     {
-        this.keyState.ClearAll();
+        this.dalamud.KeyState.ClearAll();
     }
 
     public void Dispose()
     {
-        this.framework.Update -= OnFrameworkUpdate;
-        GC.SuppressFinalize(this);
+        this.dalamud.Framework.Update -= OnFrameworkUpdate;
     }
 
     private void OnFrameworkUpdate(IFramework framework)
     {
-        foreach (var key in this.keyState.GetValidVirtualKeys())
+        foreach (var key in this.dalamud.KeyState.GetValidVirtualKeys())
         {
-            var keyState = this.keyState.GetRawValue(key) != 0;
+            var keyState = this.dalamud.KeyState.GetRawValue(key) != 0;
             if (!this.keyStates.TryGetValue(key, out var oldState))
             {
                 this.keyStates.Add(key, keyState);

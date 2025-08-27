@@ -2,6 +2,7 @@
 using Dalamud.Game.ClientState.Keys;
 using Dalamud.Plugin;
 using NLog;
+using SmartPings.Audio;
 using SmartPings.Data;
 using System;
 
@@ -34,6 +35,7 @@ namespace SmartPings
 
         public float MasterVolume { get; set; } = 1.0f;
         public int MaxConcurrentSfx { get; set; } = 5;
+        public PingSounds.Pack ActiveSoundPack { get; set; } = PingSounds.Pack.Default;
         public bool EnableSpatialization { get; set; } = true;
         public float SpatializationMinimumDistance { get; set; } = 5.0f;
 

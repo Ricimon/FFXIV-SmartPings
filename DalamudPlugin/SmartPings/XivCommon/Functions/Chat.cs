@@ -25,6 +25,7 @@ using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.System.Memory;
 using FFXIVClientStructs.FFXIV.Client.System.String;
 using Lumina.Excel.Sheets;
+using SmartPings;
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -74,15 +75,15 @@ public unsafe class Chat
 
     private readonly IDataManager dataManager;
 
-    public Chat(ISigScanner sigScanner, IDataManager dataManager)
+    public Chat(DalamudServices dalamud)
     {
-        this.dataManager = dataManager;
+        this.dataManager = dalamud.DataManager;
 
-        if(sigScanner.TryScanText(SendChatSignature, out var processChatBoxPtr))
+        if(dalamud.SigScanner.TryScanText(SendChatSignature, out var processChatBoxPtr))
         {
             ProcessChatBox = Marshal.GetDelegateForFunctionPointer<ProcessChatBoxDelegate>(processChatBoxPtr);
         }
-        if(sigScanner.TryScanText(SanitiseStringSignature, out var sanitisePtr))
+        if(dalamud.SigScanner.TryScanText(SanitiseStringSignature, out var sanitisePtr))
         {
             SanitizeString = Marshal.GetDelegateForFunctionPointer<SanitizeStringDelegate>(sanitisePtr);
         }

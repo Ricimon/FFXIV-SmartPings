@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using Windows.ApplicationModel.Background;
 using WindowsInput;
 using WindowsInput.Events;
 using WindowsInput.Events.Sources;
 
 namespace SmartPings.Input;
 
-public class InputEventSource(Configuration configuration) : IDisposable
+public sealed class InputEventSource(Configuration configuration) : IDisposable
 {
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
@@ -53,7 +52,6 @@ public class InputEventSource(Configuration configuration) : IDisposable
             mouse.ButtonUp -= OnMouseButtonUp;
         }
         mouse?.Dispose();
-        GC.SuppressFinalize(this);
     }
 
     public void SubscribeToKeyDown(Action<KeyDown> action)

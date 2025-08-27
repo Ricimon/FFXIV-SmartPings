@@ -1,39 +1,35 @@
-﻿using Dalamud.Plugin.Services;
+﻿using System;
+using System.Text;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using Lumina.Excel.Sheets;
 using SmartPings.Extensions;
 using SmartPings.Log;
-using System;
-using System.Text;
 
 namespace SmartPings;
 
-public class MapManager : IDisposable
+public sealed class MapManager : IDisposable
 {
-    public ushort CurrentTerritoryId => this.clientState.TerritoryType;
-    public uint CurrentMapId => this.clientState.MapId;
+    public ushort CurrentTerritoryId => this.dalamud.ClientState.TerritoryType;
+    public uint CurrentMapId => this.dalamud.ClientState.MapId;
 
     public event System.Action? OnMapChanged;
 
-    private readonly IClientState clientState;
-    private readonly IDataManager dataManager;
+    private readonly DalamudServices dalamud;
     private readonly ILogger logger;
 
-    public MapManager(IClientState clientState, IDataManager dataManager, ILogger logger)
+    public MapManager(DalamudServices dalamud, ILogger logger)
     {
-        this.clientState = clientState;
-        this.dataManager = dataManager;
+        this.dalamud = dalamud;
         this.logger = logger;
 
-        this.clientState.TerritoryChanged += OnTerritoryChanged;
-        OnTerritoryChanged(this.clientState.TerritoryType);
+        this.dalamud.ClientState.TerritoryChanged += OnTerritoryChanged;
+        OnTerritoryChanged(this.dalamud.ClientState.TerritoryType);
     }
 
     public void Dispose()
     {
-        this.clientState.TerritoryChanged -= OnTerritoryChanged;
-        GC.SuppressFinalize(this);
+        this.dalamud.ClientState.TerritoryChanged -= OnTerritoryChanged;
     }
 
     public unsafe bool InSharedWorldMap()
@@ -96,9 +92,9 @@ public class MapManager : IDisposable
         if (InSharedWorldMap())
         {
             s.Append('_');
-            if (this.clientState.LocalPlayer != null)
+            if (this.dalamud.ClientState.LocalPlayer != null)
             {
-                s.Append(this.clientState.LocalPlayer.CurrentWorld.Value.Name.ToString());
+                s.Append(this.dalamud.ClientState.LocalPlayer.CurrentWorld.Value.Name.ToString());
             }
             else
             {

@@ -1,27 +1,22 @@
 ﻿using Dalamud.Game.Command;
-using Dalamud.Plugin.Services;
-using System;
 using SmartPings.UI.Presenter;
 
 namespace SmartPings;
 
-public class CommandDispatcher(
-    ICommandManager commandManager,
+public sealed class CommandDispatcher(
+    DalamudServices dalamud,
     MainWindowPresenter mainWindowPresenter) : IDalamudHook
 {
     private const string commandName = "/smartpings";
     private const string commandNameAlt = "/sp";
 
-    private readonly ICommandManager commandManager = commandManager ?? throw new ArgumentNullException(nameof(commandManager));
-    private readonly MainWindowPresenter mainWindowPresenter = mainWindowPresenter ?? throw new ArgumentNullException(nameof(mainWindowPresenter));
-
     public void HookToDalamud()
     {
-        this.commandManager.AddHandler(commandName, new CommandInfo(OnCommand)
+        dalamud.CommandManager.AddHandler(commandName, new CommandInfo(OnCommand)
         {
             HelpMessage = "Open the SmartPings window"
         });
-        this.commandManager.AddHandler(commandNameAlt, new CommandInfo(OnCommand)
+        dalamud.CommandManager.AddHandler(commandNameAlt, new CommandInfo(OnCommand)
         {
             HelpMessage = "Open the SmartPings window"
         });
@@ -29,8 +24,8 @@ public class CommandDispatcher(
 
     public void Dispose()
     {
-        this.commandManager.RemoveHandler(commandName);
-        this.commandManager.RemoveHandler(commandNameAlt);
+        dalamud.CommandManager.RemoveHandler(commandName);
+        dalamud.CommandManager.RemoveHandler(commandNameAlt);
     }
 
     private void OnCommand(string command, string args)
@@ -41,6 +36,6 @@ public class CommandDispatcher(
 
     private void ShowMainWindow()
     {
-        this.mainWindowPresenter.View.Visible = true;
+        mainWindowPresenter.View.Visible = true;
     }
 }

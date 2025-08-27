@@ -1,21 +1,19 @@
-﻿using AsyncAwaitBestPractices;
-using Dalamud.Game.Text;
-using Dalamud.Plugin;
-using Dalamud.Plugin.Services;
-using SmartPings.Extensions;
-using SmartPings.Log;
-using SocketIOClient;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using System.Threading.Tasks;
+using AsyncAwaitBestPractices;
+using Dalamud.Game.Text;
+using SmartPings.Extensions;
+using SmartPings.Log;
+using SocketIOClient;
 
 namespace SmartPings.Network;
 
-public class ServerConnection : IDisposable
+public sealed class ServerConnection : IDisposable
 {
     /// <summary>
     /// When in a public room, this plugin will automatically switch rooms when the player changes maps.
@@ -50,10 +48,7 @@ public class ServerConnection : IDisposable
 
     private const string PeerType = "player";
 
-    private readonly IClientState clientState;
-    private readonly IObjectTable objectTable;
-    private readonly IFramework framework;
-    private readonly IChatGui chatGui;
+    private readonly DalamudServices dalamud;
     private readonly MapManager mapManager;
     private readonly Lazy<GroundPingPresenter> groundPingPresenter;
     private readonly ILogger logger;
@@ -64,24 +59,17 @@ public class ServerConnection : IDisposable
     private string[]? playersInRoom;
 
     public ServerConnection(
-        IDalamudPluginInterface pluginInterface,
-        IClientState clientState,
-        IObjectTable objectTable,
-        IFramework framework,
-        IChatGui chatGui,
+        DalamudServices dalamud,
         MapManager mapManager,
         Lazy<GroundPingPresenter> groundPingPresenter,
         ILogger logger)
     {
-        this.clientState = clientState;
-        this.objectTable = objectTable;
-        this.framework = framework;
-        this.chatGui = chatGui;
+        this.dalamud = dalamud;
         this.mapManager = mapManager;
         this.groundPingPresenter = groundPingPresenter;
         this.logger = logger;
 
-        var configPath = Path.Combine(pluginInterface.AssemblyLocation.DirectoryName ?? string.Empty, "config.json");
+        var configPath = Path.Combine(this.dalamud.PluginInterface.AssemblyLocation.DirectoryName ?? string.Empty, "config.json");
         this.loadConfig = null!;
         if (File.Exists(configPath))
         {
@@ -98,14 +86,13 @@ public class ServerConnection : IDisposable
             this.loadConfig = new();
         }
 
-        this.clientState.Logout += OnLogout;
+        this.dalamud.ClientState.Logout += OnLogout;
     }
 
     public void Dispose()
     {
         this.Channel?.Dispose();
-        this.clientState.Logout -= OnLogout;
-        GC.SuppressFinalize(this);
+        this.dalamud.ClientState.Logout -= OnLogout;
     }
 
     public void JoinPublicRoom()
@@ -221,10 +208,10 @@ public class ServerConnection : IDisposable
 
     private IEnumerable<string> GetOtherPlayerNamesInInstance()
     {
-        return this.objectTable.GetPlayers()
+        return this.dalamud.ObjectTable.GetPlayers()
             .Select(p => p.GetPlayerFullName())
             .Where(s => s != null)
-            .Where(s => s != this.clientState.GetLocalPlayerFullName())
+            .Where(s => s != this.dalamud.ClientState.GetLocalPlayerFullName())
             .Cast<string>();
     }
 
@@ -238,7 +225,7 @@ public class ServerConnection : IDisposable
 
         this.logger.Debug("Attemping to join room.");
 
-        var playerName = this.clientState.GetLocalPlayerFullName();
+        var playerName = this.dalamud.ClientState.GetLocalPlayerFullName();
         if (playerName == null)
         {
 #if DEBUG
@@ -294,7 +281,7 @@ public class ServerConnection : IDisposable
                 // Also in some housing districts, the mapId is different after the OnTerritoryChanged event
                 await Task.Delay(1000);
                 // Accessing the object table must happen on the main thread
-                this.framework.Run(() =>
+                this.dalamud.Framework.Run(() =>
                 {
                     var roomName = this.mapManager.GetCurrentMapPublicRoomName();
                     string[]? otherPlayers = this.mapManager.InSharedWorldMap() ? null : GetOtherPlayerNamesInInstance().ToArray();
@@ -358,6 +345,6 @@ public class ServerConnection : IDisposable
             Type = payload.chatType,
             MessageBytes = payload.message
         };
-        this.chatGui.Print(xivMsg);
+        this.dalamud.ChatGui.Print(xivMsg);
     }
 }

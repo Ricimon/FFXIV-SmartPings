@@ -2,7 +2,6 @@
 using System.Reactive.Linq;
 using AsyncAwaitBestPractices;
 using Dalamud.Game.ClientState.Keys;
-using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using Newtonsoft.Json;
@@ -19,28 +18,15 @@ namespace SmartPings.UI.Presenter;
 
 public class MainWindowPresenter(
     MainWindow view,
+    DalamudServices dalamud,
     Configuration configuration,
-    IClientState clientState,
-    IFramework framework,
-    IDataManager dataManager,
     IAudioDeviceController audioDeviceController,
     ServerConnection serverConnection,
     KeyStateWrapper keyStateWrapper,
     XivHudNodeMap hudNodeMap,
     ILogger logger) : IPluginUIPresenter
 {
-    public IPluginUIView View => this.view;
-
-    private readonly MainWindow view = view;
-    private readonly Configuration configuration = configuration;
-    private readonly IClientState clientState = clientState;
-    private readonly IFramework framework = framework;
-    private readonly IDataManager dataManager = dataManager;
-    private readonly IAudioDeviceController audioDeviceController = audioDeviceController;
-    private readonly ServerConnection serverConection = serverConnection;
-    private readonly KeyStateWrapper keyStateWrapper = keyStateWrapper;
-    private readonly XivHudNodeMap hudNodeMap = hudNodeMap;
-    private readonly ILogger logger = logger;
+    public IPluginUIView View => view;
 
     private bool keyDownListenerSubscribed;
 
@@ -52,121 +38,119 @@ public class MainWindowPresenter(
 
     private void BindVariables()
     {
-        Bind(this.view.PublicRoom,
-            b =>
-            {
-                this.configuration.PublicRoom = b; this.configuration.Save();
-            },
-            this.configuration.PublicRoom);
-        Bind(this.view.RoomName,
-            s => { this.configuration.RoomName = s; this.configuration.Save(); }, this.configuration.RoomName);
-        Bind(this.view.RoomPassword,
-            s => { this.configuration.RoomPassword = s; this.configuration.Save(); }, this.configuration.RoomPassword);
+        Bind(view.PublicRoom,
+            b => { configuration.PublicRoom = b; configuration.Save(); }, configuration.PublicRoom);
+        Bind(view.RoomName,
+            s => { configuration.RoomName = s; configuration.Save(); }, configuration.RoomName);
+        Bind(view.RoomPassword,
+            s => { configuration.RoomPassword = s; configuration.Save(); }, configuration.RoomPassword);
 
-        Bind(this.view.EnableGroundPings,
-            b => { this.configuration.EnableGroundPings = b; this.configuration.Save(); }, this.configuration.EnableGroundPings);
-        Bind(this.view.EnablePingWheel,
-            b => { this.configuration.EnablePingWheel = b; this.configuration.Save(); }, this.configuration.EnablePingWheel);
-        Bind(this.view.DefaultGroundPingType,
-            b => { this.configuration.DefaultGroundPingType = b; this.configuration.Save(); }, this.configuration.DefaultGroundPingType);
+        Bind(view.EnableGroundPings,
+            b => { configuration.EnableGroundPings = b; configuration.Save(); }, configuration.EnableGroundPings);
+        Bind(view.EnablePingWheel,
+            b => { configuration.EnablePingWheel = b; configuration.Save(); }, configuration.EnablePingWheel);
+        Bind(view.DefaultGroundPingType,
+            b => { configuration.DefaultGroundPingType = b; configuration.Save(); }, configuration.DefaultGroundPingType);
 
-        Bind(this.view.EnableGuiPings,
-            b => { this.configuration.EnableGuiPings = b; this.configuration.Save(); }, this.configuration.EnableGuiPings);
-        Bind(this.view.EnableHpMpPings,
-            b => { this.configuration.EnableHpMpPings = b; this.configuration.Save(); }, this.configuration.EnableHpMpPings);
-        Bind(this.view.SendGuiPingsToCustomServer,
-            b => { this.configuration.SendGuiPingsToCustomServer = b; this.configuration.Save(); }, this.configuration.SendGuiPingsToCustomServer);
-        Bind(this.view.SendGuiPingsToXivChat,
-            b => { this.configuration.SendGuiPingsToXivChat = b; this.configuration.Save(); }, this.configuration.SendGuiPingsToXivChat);
-        Bind(this.view.XivChatSendLocation,
-            b => { this.configuration.XivChatSendLocation = b; this.configuration.Save(); }, this.configuration.XivChatSendLocation);
+        Bind(view.EnableGuiPings,
+            b => { configuration.EnableGuiPings = b; configuration.Save(); }, configuration.EnableGuiPings);
+        Bind(view.EnableHpMpPings,
+            b => { configuration.EnableHpMpPings = b; configuration.Save(); }, configuration.EnableHpMpPings);
+        Bind(view.SendGuiPingsToCustomServer,
+            b => { configuration.SendGuiPingsToCustomServer = b; configuration.Save(); }, configuration.SendGuiPingsToCustomServer);
+        Bind(view.SendGuiPingsToXivChat,
+            b => { configuration.SendGuiPingsToXivChat = b; configuration.Save(); }, configuration.SendGuiPingsToXivChat);
+        Bind(view.XivChatSendLocation,
+            b => { configuration.XivChatSendLocation = b; configuration.Save(); }, configuration.XivChatSendLocation);
 
-        Bind(this.view.SelectedAudioOutputDeviceIndex,
-            i => this.audioDeviceController.AudioPlaybackDeviceIndex = i, this.audioDeviceController.AudioPlaybackDeviceIndex);
-        Bind(this.view.MasterVolume,
-            f => { this.configuration.MasterVolume = f; this.configuration.Save(); }, this.configuration.MasterVolume);
-        Bind(this.view.EnableSpatialization,
-            b => { this.configuration.EnableSpatialization = b; this.configuration.Save(); }, this.configuration.EnableSpatialization);
+        Bind(view.SelectedAudioOutputDeviceIndex,
+            i => audioDeviceController.AudioPlaybackDeviceIndex = i, audioDeviceController.AudioPlaybackDeviceIndex);
+        Bind(view.MasterVolume,
+            f => { configuration.MasterVolume = f; configuration.Save(); }, configuration.MasterVolume);
+        Bind(view.ActiveSoundPack,
+            b => { configuration.ActiveSoundPack = b; configuration.Save(); }, configuration.ActiveSoundPack);
+        Bind(view.EnableSpatialization,
+            b => { configuration.EnableSpatialization = b; configuration.Save(); }, configuration.EnableSpatialization);
 
-        Bind(this.view.PlayRoomJoinAndLeaveSounds,
-            b => { this.configuration.PlayRoomJoinAndLeaveSounds = b; this.configuration.Save(); }, this.configuration.PlayRoomJoinAndLeaveSounds);
-        Bind(this.view.KeybindsRequireGameFocus,
-            b => { this.configuration.KeybindsRequireGameFocus = b; this.configuration.Save(); }, this.configuration.KeybindsRequireGameFocus);
-        Bind(this.view.PrintLogsToChat,
-            b => { this.configuration.PrintLogsToChat = b; this.configuration.Save(); }, this.configuration.PrintLogsToChat);
-        Bind(this.view.MinimumVisibleLogLevel,
-            i => { this.configuration.MinimumVisibleLogLevel = i; this.configuration.Save(); }, this.configuration.MinimumVisibleLogLevel);
+        Bind(view.PlayRoomJoinAndLeaveSounds,
+            b => { configuration.PlayRoomJoinAndLeaveSounds = b; configuration.Save(); }, configuration.PlayRoomJoinAndLeaveSounds);
+        Bind(view.KeybindsRequireGameFocus,
+            b => { configuration.KeybindsRequireGameFocus = b; configuration.Save(); }, configuration.KeybindsRequireGameFocus);
+        Bind(view.PrintLogsToChat,
+            b => { configuration.PrintLogsToChat = b; configuration.Save(); }, configuration.PrintLogsToChat);
+        Bind(view.MinimumVisibleLogLevel,
+            i => { configuration.MinimumVisibleLogLevel = i; configuration.Save(); }, configuration.MinimumVisibleLogLevel);
     }
 
     private void BindActions()
     {
-        this.view.JoinRoom.Subscribe(_ =>
+        view.JoinRoom.Subscribe(_ =>
         {
-            this.serverConection.Channel?.ClearLatestDisconnectMessage();
-            if (this.view.PublicRoom.Value)
+            serverConnection.Channel?.ClearLatestDisconnectMessage();
+            if (view.PublicRoom.Value)
             {
-                this.serverConection.JoinPublicRoom();
+                serverConnection.JoinPublicRoom();
             }
             else
             {
-                if (string.IsNullOrEmpty(this.view.RoomName.Value))
+                if (string.IsNullOrEmpty(view.RoomName.Value))
                 {
-                    var playerName = this.clientState.GetLocalPlayerFullName();
+                    var playerName = dalamud.ClientState.GetLocalPlayerFullName();
                     if (playerName == null)
                     {
-                        this.logger.Error("Player name is null, cannot autofill private room name.");
+                        logger.Error("Player name is null, cannot autofill private room name.");
                         return;
                     }
-                    this.view.RoomName.Value = playerName;
+                    view.RoomName.Value = playerName;
                 }
-                this.serverConection.JoinPrivateRoom(this.view.RoomName.Value, this.view.RoomPassword.Value);
+                serverConnection.JoinPrivateRoom(view.RoomName.Value, view.RoomPassword.Value);
             }
         });
 
-        this.view.LeaveRoom.Subscribe(_ => this.serverConection.LeaveRoom(false).SafeFireAndForget(ex => this.logger.Error(ex.ToString())));
+        view.LeaveRoom.Subscribe(_ => serverConnection.LeaveRoom(false).SafeFireAndForget(ex => logger.Error(ex.ToString())));
 
-        this.view.KeybindBeingEdited.Subscribe(k =>
+        view.KeybindBeingEdited.Subscribe(k =>
         {
             if (k != Keybind.None && !this.keyDownListenerSubscribed)
             {
-                this.keyStateWrapper.OnKeyDown += OnKeyDown;
+                keyStateWrapper.OnKeyDown += OnKeyDown;
                 this.keyDownListenerSubscribed = true;
             }
             else if (k == Keybind.None && this.keyDownListenerSubscribed)
             {
-                this.keyStateWrapper.OnKeyDown -= OnKeyDown;
+                keyStateWrapper.OnKeyDown -= OnKeyDown;
                 this.keyDownListenerSubscribed = false;
             }
         });
-        this.view.ClearKeybind.Subscribe(k =>
+        view.ClearKeybind.Subscribe(k =>
         {
             switch (k)
             {
                 case Keybind.Ping:
-                    this.configuration.PingKeybind = default; break;
+                    configuration.PingKeybind = default; break;
                 case Keybind.QuickPing:
-                    this.configuration.QuickPingKeybind = default; break;
+                    configuration.QuickPingKeybind = default; break;
                 default:
                     return;
             }
-            this.configuration.Save();
+            configuration.Save();
         });
 
-        this.view.PrintNodeMap1.Subscribe(_ =>
+        view.PrintNodeMap1.Subscribe(_ =>
         {
-            foreach (var n in this.hudNodeMap.CollisionNodeMap)
+            foreach (var n in hudNodeMap.CollisionNodeMap)
             {
-                this.logger.Info("Node {0} -> {1}:{2}", n.Key.ToString("X"), n.Value.HudSection, n.Value.Index);
+                logger.Info("Node {0} -> {1}:{2}", n.Key.ToString("X"), n.Value.HudSection, n.Value.Index);
             }
         });
-        this.view.PrintNodeMap2.Subscribe(_ =>
+        view.PrintNodeMap2.Subscribe(_ =>
         {
-            foreach (var n in this.hudNodeMap.ElementNodeMap)
+            foreach (var n in hudNodeMap.ElementNodeMap)
             {
-                this.logger.Info("HudSection {0} -> {1}", n.Key.HudSection, n.Value.ToString("X"));
+                logger.Info("HudSection {0} -> {1}", n.Key.HudSection, n.Value.ToString("X"));
             }
         });
-        this.view.PrintPartyStatuses.Subscribe(_ =>
+        view.PrintPartyStatuses.Subscribe(_ =>
         {
             unsafe
             {
@@ -182,7 +166,7 @@ public class MainWindowPresenter(
                     foreach (var characterStatus in partyMember.Object->StatusManager.Status)
                     {
                         if (characterStatus.StatusId == 0) { continue; }
-                        var luminaStatuses = this.dataManager.GetExcelSheet<Lumina.Excel.Sheets.Status>(this.clientState.ClientLanguage);
+                        var luminaStatuses = dalamud.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Status>(dalamud.ClientState.ClientLanguage);
                         Status status = new() { Id = characterStatus.StatusId };
                         if (luminaStatuses.TryGetRow(characterStatus.StatusId, out var luminaStatus))
                         {
@@ -193,13 +177,13 @@ public class MainWindowPresenter(
                                 Stacks = characterStatus.Param,
                             };
                         }
-                        this.logger.Info("Party member {0}, index {1}, has status {2}",
+                        logger.Info("Party member {0}, index {1}, has status {2}",
                            partyMember.Object->NameString, partyMember.Index, JsonConvert.SerializeObject(status).ToString());
                     }
                 }
             }
         });
-        this.view.PrintTargetStatuses.Subscribe(_ =>
+        view.PrintTargetStatuses.Subscribe(_ =>
         {
             unsafe
             {
@@ -207,11 +191,11 @@ public class MainWindowPresenter(
                 var target = CharacterManager.Instance()->LookupBattleCharaByEntityId(targetId);
                 if (target != null)
                 {
-                    this.logger.Info("Target id {0}, name {1}", targetId, target->NameString);
+                    logger.Info("Target id {0}, name {1}", targetId, target->NameString);
                     foreach(var targetStatus in target->StatusManager.Status)
                     {
                         if (targetStatus.StatusId == 0) { continue; }
-                        var luminaStatuses = this.dataManager.GetExcelSheet<Lumina.Excel.Sheets.Status>(this.clientState.ClientLanguage);
+                        var luminaStatuses = dalamud.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Status>(dalamud.ClientState.ClientLanguage);
                         Status status = new() { Id = targetStatus.StatusId };
                         if (luminaStatuses.TryGetRow(targetStatus.StatusId, out var luminaStatus))
                         {
@@ -222,12 +206,12 @@ public class MainWindowPresenter(
                                 Stacks = targetStatus.Param,
                             };
                         }
-                        this.logger.Info("Target has status {0}", JsonConvert.SerializeObject(status).ToString());
+                        logger.Info("Target has status {0}", JsonConvert.SerializeObject(status).ToString());
                     }
                 }
                 else
                 {
-                    this.logger.Info("No target.");
+                    logger.Info("No target.");
                 }
             }
         });
@@ -252,21 +236,21 @@ public class MainWindowPresenter(
 
         // This callback can be called from a non-framework thread, and UI values should only be modified
         // on the framework thread (or else the game can crash)
-        this.framework.Run(() =>
+        dalamud.Framework.Run(() =>
         {
-            var editedKeybind = this.view.KeybindBeingEdited.Value;
-            this.view.KeybindBeingEdited.Value = Keybind.None;
+            var editedKeybind = view.KeybindBeingEdited.Value;
+            view.KeybindBeingEdited.Value = Keybind.None;
 
             switch (editedKeybind)
             {
                 case Keybind.Ping:
-                    this.configuration.PingKeybind = key; break;
+                    configuration.PingKeybind = key; break;
                 case Keybind.QuickPing:
-                    this.configuration.QuickPingKeybind = key; break;
+                    configuration.QuickPingKeybind = key; break;
                 default:
                     return;
             }
-            this.configuration.Save();
+            configuration.Save();
         });
     }
 

@@ -1,6 +1,7 @@
-﻿using Dalamud.Bindings.ImGui;
-using Dalamud.Plugin;
-using Dalamud.Plugin.Services;
+﻿using System;
+using System.Numerics;
+using System.Reactive.Subjects;
+using Dalamud.Bindings.ImGui;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
@@ -10,13 +11,10 @@ using SmartPings.Input;
 using SmartPings.Log;
 using SmartPings.UI.Util;
 using SmartPings.UI.View;
-using System;
-using System.Numerics;
-using System.Reactive.Subjects;
 
 namespace SmartPings;
 
-public class GroundPingView : IPluginUIView, IDisposable
+public class GroundPingView : IPluginUIView
 {
     // this extra bool exists for ImGui, since you can't ref a property
     private bool visible = false;
@@ -30,22 +28,15 @@ public class GroundPingView : IPluginUIView, IDisposable
     private readonly Subject<GroundPing> addGroundPing = new();
 
     private readonly Lazy<GroundPingPresenter> presenter;
-    private readonly IDalamudPluginInterface pluginInterface;
-    private readonly IClientState clientState;
-    private readonly IGameGui gameGui;
-    private readonly ITextureProvider textureProvider;
-    private readonly IAddonLifecycle addonLifecycle;
-    private readonly IAddonEventManager addonEventManager;
-    private readonly IDataManager dataManager;
+    private readonly DalamudServices dalamud;
     private readonly InputEventSource inputEventSource;
     private readonly KeyStateWrapper keyStateWrapper;
     private readonly Configuration configuration;
     private readonly MapManager mapManager;
     private readonly IAudioDeviceController audioDeviceController;
+    private readonly PingSounds pingSounds;
     private readonly Lazy<Spatializer> spatializer;
     private readonly ILogger logger;
-
-    private readonly CachedSound basicPingSound;
 
     private enum PingWheelSection
     {
@@ -77,39 +68,27 @@ public class GroundPingView : IPluginUIView, IDisposable
 
     public GroundPingView(
         Lazy<GroundPingPresenter> presenter,
-        IDalamudPluginInterface pluginInterface,
-        IClientState clientState,
-        IGameGui gameGui,
-        ITextureProvider textureProvider,
-        IAddonLifecycle addonLifecycle,
-        IAddonEventManager addonEventManager,
-        IDataManager dataManager,
+        DalamudServices dalamud,
         InputEventSource inputEventSource,
         KeyStateWrapper keyStateWrapper,
         Configuration configuration,
         MapManager mapManager,
         GuiPingHandler uiPingHandler,
         IAudioDeviceController audioDeviceController,
+        PingSounds pingSounds,
         Lazy<Spatializer> spatializer,
         ILogger logger)
     {
         this.presenter = presenter;
-        this.pluginInterface = pluginInterface;
-        this.clientState = clientState;
-        this.gameGui = gameGui;
-        this.textureProvider = textureProvider;
-        this.addonLifecycle = addonLifecycle;
-        this.addonEventManager = addonEventManager;
-        this.dataManager = dataManager;
+        this.dalamud = dalamud;
         this.inputEventSource = inputEventSource;
         this.keyStateWrapper = keyStateWrapper;
         this.configuration = configuration;
         this.mapManager = mapManager;
         this.audioDeviceController = audioDeviceController;
+        this.pingSounds = pingSounds;
         this.spatializer = spatializer;
         this.logger = logger;
-
-        this.basicPingSound = new(this.pluginInterface.GetResourcePath("basic_ping.wav"));
 
         this.keyStateWrapper.OnKeyDown += key =>
         {
@@ -174,11 +153,6 @@ public class GroundPingView : IPluginUIView, IDisposable
         });
     }
 
-    public void Dispose()
-    {
-        GC.SuppressFinalize(this);
-    }
-
     public void Draw()
     {
         if (this.presenter.Value == null) { return; }
@@ -188,7 +162,7 @@ public class GroundPingView : IPluginUIView, IDisposable
             ImGui.SetNextFrameWantCaptureMouse(true);
         }
 
-        if (clientState.LocalPlayer != null)
+        if (this.dalamud.ClientState.LocalPlayer != null)
         {
             if (!DrawPings())
             {
@@ -233,14 +207,14 @@ public class GroundPingView : IPluginUIView, IDisposable
                     // When ping wheel isn't enabled, it feels better to place the ping at the mouse position on left click release rather than press
                     var pingPosition = this.configuration.EnablePingWheel ? pingLeftClickPosition!.Value : ImGui.GetMousePos();
                     if (pingType != GroundPing.Type.None &&
-                        this.gameGui.ScreenToWorld(pingPosition, out var worldPos))
+                        this.dalamud.GameGui.ScreenToWorld(pingPosition, out var worldPos))
                     {
                         this.logger.Debug("Clicked on world position {0} for ground ping", worldPos);
                         var ping = new GroundPing
                         {
                             PingType = pingType,
                             StartTimestamp = DateTime.UtcNow.Ticks,
-                            Author = this.clientState.LocalPlayer.Name.TextValue,
+                            Author = this.dalamud.ClientState.LocalPlayer.Name.TextValue,
                             MapId = this.mapManager.GetCurrentMapPublicRoomName(),
                             WorldPosition = worldPos,
                         };
@@ -349,12 +323,10 @@ public class GroundPingView : IPluginUIView, IDisposable
             // SFX
             if (p.SfxId == default)
             {
-                switch(p.PingType)
+                if (this.pingSounds.TryGetSound(this.configuration.ActiveSoundPack, p.PingType, out var sound))
                 {
-                    case GroundPing.Type.Basic:
-                        p.SfxId = this.audioDeviceController.PlaySfx(this.basicPingSound);
-                        this.spatializer.Value.UpdatePingVolume(p);
-                        break;
+                    p.SfxId = this.audioDeviceController.PlaySfx(sound);
+                    this.spatializer.Value.UpdatePingVolume(p);
                 }
             }
 
@@ -368,13 +340,13 @@ public class GroundPingView : IPluginUIView, IDisposable
 
     private void DrawPingCursor(ImDrawListPtr drawList, Vector2 mousePosition, Vector2 size)
     {
-        var img = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath("ping_cursor.png")).GetWrapOrDefault()?.Handle ?? default;
+        var img = this.dalamud.TextureProvider.GetFromFile(this.dalamud.PluginInterface.GetResourcePath("ping_cursor.png")).GetWrapOrDefault()?.Handle ?? default;
         drawList.AddImage(img, mousePosition - size / 2, mousePosition + size / 2);
     }
 
     private PingWheelSection DrawPingWheel(ImDrawListPtr drawList, Vector2 wheelPosition, Vector2 mousePosition)
     {
-        var img = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath("ping_wheel_sheet.png")).GetWrapOrDefault()?.Handle ?? default;
+        var img = this.dalamud.TextureProvider.GetFromFile(this.dalamud.PluginInterface.GetResourcePath("ping_wheel_sheet.png")).GetWrapOrDefault()?.Handle ?? default;
         int rowCount = 2;
         int colCount = 3;
         int totalWidth = 1536;
@@ -484,7 +456,7 @@ public class GroundPingView : IPluginUIView, IDisposable
         int pingLastFrameOfAuthorTag, int pingFrame0HoldFrames, float pingToRingSizeRatio, Vector2 pingRingPivotOffset, Vector2 pingPivotOffset)
     {
         bool draw = false;
-        var onScreen = this.gameGui.WorldToScreen(worldPosition, out var screenPosition);
+        var onScreen = this.dalamud.GameGui.WorldToScreen(worldPosition, out var screenPosition);
 
         // Calculate screen size based on world position
         var hForward = Vector3.Normalize(new Vector3(nearPlane.X, 0, nearPlane.Z));
@@ -493,10 +465,10 @@ public class GroundPingView : IPluginUIView, IDisposable
         var wpRight = worldPosition + scale * hRight;
         var wpBack = worldPosition - scale * hForward;
         var wpLeft = worldPosition - scale * hRight;
-        this.gameGui.WorldToScreen(wpForward, out var spForward);
-        this.gameGui.WorldToScreen(wpRight, out var spRight);
-        this.gameGui.WorldToScreen(wpBack, out var spBack);
-        this.gameGui.WorldToScreen(wpLeft, out var spLeft);
+        this.dalamud.GameGui.WorldToScreen(wpForward, out var spForward);
+        this.dalamud.GameGui.WorldToScreen(wpRight, out var spRight);
+        this.dalamud.GameGui.WorldToScreen(wpBack, out var spBack);
+        this.dalamud.GameGui.WorldToScreen(wpLeft, out var spLeft);
 
         var ringSize = new Vector2(MathF.Abs(spRight.X - spLeft.X), MathF.Abs(spForward.Y - spBack.Y));
         // Clamp to min and max sizes if necessary
@@ -513,7 +485,7 @@ public class GroundPingView : IPluginUIView, IDisposable
 
         float fps = 30;
         {
-            var imgRing = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath(ringPath)).GetWrapOrDefault()?.Handle ?? default;
+            var imgRing = this.dalamud.TextureProvider.GetFromFile(this.dalamud.PluginInterface.GetResourcePath(ringPath)).GetWrapOrDefault()?.Handle ?? default;
 
             int frame = (int)(time * fps);
             if (frame < ringTotalFrames)
@@ -533,7 +505,7 @@ public class GroundPingView : IPluginUIView, IDisposable
         }
 
         {
-            var imgPing = this.textureProvider.GetFromFile(this.pluginInterface.GetResourcePath(pingPath)).GetWrapOrDefault()?.Handle ?? default;
+            var imgPing = this.dalamud.TextureProvider.GetFromFile(this.dalamud.PluginInterface.GetResourcePath(pingPath)).GetWrapOrDefault()?.Handle ?? default;
 
             int frame = (int)(time * fps);
             if (frame < pingTotalFrames)

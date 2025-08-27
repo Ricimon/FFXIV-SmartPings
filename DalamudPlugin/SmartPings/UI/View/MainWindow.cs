@@ -10,8 +10,6 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Keys;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
-using Dalamud.Plugin;
-using Dalamud.Plugin.Services;
 using Reactive.Bindings;
 using SmartPings.Audio;
 using SmartPings.Data;
@@ -57,6 +55,7 @@ public class MainWindow : Window, IPluginUIView, IDisposable
 
     public IReactiveProperty<int> SelectedAudioOutputDeviceIndex { get; } = new ReactiveProperty<int>(-1);
     public IReactiveProperty<float> MasterVolume { get; } = new ReactiveProperty<float>();
+    public IReactiveProperty<PingSounds.Pack> ActiveSoundPack { get; } = new ReactiveProperty<PingSounds.Pack>();
     public IReactiveProperty<bool> EnableSpatialization { get; } = new ReactiveProperty<bool>();
 
     public IObservable<Unit> PrintNodeMap1 => printNodeMap1.AsObservable();
@@ -74,16 +73,16 @@ public class MainWindow : Window, IPluginUIView, IDisposable
     public IReactiveProperty<int> MinimumVisibleLogLevel { get; } = new ReactiveProperty<int>();
 
     private readonly WindowSystem windowSystem;
-    private readonly IDalamudPluginInterface pluginInterface;
-    private readonly ITextureProvider textureProvider;
+    private readonly DalamudServices dalamud;
     private readonly ServerConnection serverConnection;
     private readonly MapManager mapChangeHandler;
     private readonly Configuration configuration;
-    private readonly IClientState clientState;
     private readonly IAudioDeviceController audioDeviceController;
     private readonly ILogger logger;
 
+    private readonly string windowName;
     private readonly string[] groundPingTypes;
+    private readonly string[] soundPacks;
     private readonly string[] xivChatSendLocations;
     private readonly string[] falloffTypes;
     private readonly string[] allLoggingLevels;
@@ -95,30 +94,43 @@ public class MainWindow : Window, IPluginUIView, IDisposable
 
     public MainWindow(
         WindowSystem windowSystem,
-        IDalamudPluginInterface pluginInterface,
-        ITextureProvider textureProvider,
+        DalamudServices dalamud,
         ServerConnection serverConnection,
         MapManager mapChangeHandler,
         Configuration configuration,
-        IClientState clientState,
         IAudioDeviceController audioDeviceController,
         ILogger logger) : base(
         PluginInitializer.Name)
     {
         this.windowSystem = windowSystem;
-        this.pluginInterface = pluginInterface;
-        this.textureProvider = textureProvider;
+        this.dalamud = dalamud;
         this.serverConnection = serverConnection;
         this.mapChangeHandler = mapChangeHandler;
         this.configuration = configuration;
-        this.clientState = clientState;
         this.audioDeviceController = audioDeviceController;
         this.logger = logger;
+
+        var version = GetType().Assembly.GetName().Version?.ToString() ?? string.Empty;
+        this.windowName = PluginInitializer.Name;
+        if (version.Length > 0)
+        {
+            var versionArray = version.Split(".");
+            version = string.Join(".", versionArray.Take(3));
+            this.windowName += $" v{version}";
+        }
+#if DEBUG
+        this.windowName += " (DEBUG)";
+#endif
         this.groundPingTypes = Enum.GetNames<GroundPing.Type>();
+        this.soundPacks = Enum.GetNames<PingSounds.Pack>();
         this.xivChatSendLocations = Enum.GetNames<XivChatSendLocation>();
         this.falloffTypes = Enum.GetNames<AudioFalloffModel.FalloffType>();
         this.allLoggingLevels = [.. LogLevel.AllLoggingLevels.Select(l => l.Name)];
         windowSystem.AddWindow(this);
+
+#if DEBUG
+        visible = true;
+#endif
     }
 
     public override void Draw()
@@ -132,7 +144,7 @@ public class MainWindow : Window, IPluginUIView, IDisposable
         var width = 350;
         ImGui.SetNextWindowSize(new Vector2(width, 400), ImGuiCond.FirstUseEver);
         ImGui.SetNextWindowSizeConstraints(new Vector2(width, 250), new Vector2(float.MaxValue, float.MaxValue));
-        if (ImGui.Begin("SmartPings", ref this.visible))
+        if (ImGui.Begin(this.windowName, ref this.visible))
         {
             DrawContents();
         }
@@ -235,7 +247,7 @@ public class MainWindow : Window, IPluginUIView, IDisposable
         ImGui.BeginDisabled(this.serverConnection.InRoom);
         if (this.createPrivateRoomButtonText == null || !this.serverConnection.InRoom)
         {
-            var playerName = this.clientState.GetLocalPlayerFullName();
+            var playerName = this.dalamud.ClientState.GetLocalPlayerFullName();
             this.createPrivateRoomButtonText = roomName.Length == 0 || roomName == playerName ?
                 "Create Private Room" : "Join Private Room";
         }
@@ -542,12 +554,24 @@ public class MainWindow : Window, IPluginUIView, IDisposable
                 ImGui.TableNextRow(); ImGui.TableNextColumn();
 
                 ImGui.AlignTextToFramePadding();
-                ImGui.Text("Master Volume"); ImGui.TableNextColumn();
+                ImGui.Text("Master Volume");
+                ImGui.TableNextColumn();
                 ImGui.SetNextItemWidth(ImGui.GetColumnWidth());
                 var masterVolume = this.MasterVolume.Value * 100.0f;
                 if (ImGui.SliderFloat("##MasterVolume", ref masterVolume, 0.0f, 200.0f, "%1.0f%%"))
                 {
                     this.MasterVolume.Value = masterVolume / 100.0f;
+                }
+
+                ImGui.TableNextRow(); ImGui.TableNextColumn();
+                ImGui.AlignTextToFramePadding();
+                ImGui.Text("Sound Pack");
+                ImGui.TableNextColumn();
+                ImGui.SetNextItemWidth(ImGui.GetColumnWidth());
+                var activeSoundPack = (int)this.ActiveSoundPack.Value;
+                if (ImGui.Combo("##SoundPack", ref activeSoundPack, this.soundPacks, this.soundPacks.Length))
+                {
+                    this.ActiveSoundPack.Value = (PingSounds.Pack)activeSoundPack;
                 }
 
                 ImGui.TableNextRow(); ImGui.TableNextColumn();

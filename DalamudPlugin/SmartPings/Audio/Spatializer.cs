@@ -3,42 +3,21 @@ using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using AsyncAwaitBestPractices;
-using Dalamud.Plugin.Services;
 using SmartPings.Log;
 
 namespace SmartPings.Audio;
 
-public class Spatializer : IDisposable
+public sealed class Spatializer(
+    DalamudServices dalamud,
+    Configuration configuration,
+    IAudioDeviceController audioDeviceController,
+    GroundPingPresenter groundPingPresenter,
+    ILogger logger) : IDisposable
 {
-    private readonly IClientState clientState;
-    private readonly IObjectTable objectTable;
-    private readonly IFramework framework;
-    private readonly Configuration configuration;
-    private readonly IAudioDeviceController audioDeviceController;
-    private readonly GroundPingPresenter groundPingPresenter;
-    private readonly ILogger logger;
-
     private readonly PeriodicTimer updateTimer = new(TimeSpan.FromMilliseconds(100));
     private readonly SemaphoreSlim frameworkThreadSemaphore = new(1, 1);
 
     private bool isDisposed;
-
-    public Spatializer(IClientState clientState,
-        IObjectTable objectTable,
-        IFramework framework,
-        Configuration configuration,
-        IAudioDeviceController audioDeviceController,
-        GroundPingPresenter groundPingPresenter,
-        ILogger logger)
-    {
-        this.clientState = clientState;
-        this.objectTable = objectTable;
-        this.framework = framework;
-        this.configuration = configuration;
-        this.audioDeviceController = audioDeviceController;
-        this.groundPingPresenter = groundPingPresenter;
-        this.logger = logger;
-    }
 
     public void StartUpdateLoop()
     {
@@ -51,32 +30,31 @@ public class Spatializer : IDisposable
                 {
                     return;
                 }
-                this.framework.RunOnFrameworkThread(UpdatePingVolumes).SafeFireAndForget(ex => this.logger.Error(ex.ToString()));
+                dalamud.Framework.RunOnFrameworkThread(UpdatePingVolumes).SafeFireAndForget(ex => logger.Error(ex.ToString()));
             }
-        }).SafeFireAndForget(ex => this.logger.Error(ex.ToString()));
+        }).SafeFireAndForget(ex => logger.Error(ex.ToString()));
     }
 
     public void UpdatePingVolume(GroundPing ping)
     {
         CalculateSpatialValues(ping.WorldPosition,
             out var leftVolume, out var rightVolume, out var distance, out var volume);
-        leftVolume *= this.configuration.MasterVolume;
-        rightVolume *= this.configuration.MasterVolume;
-        this.audioDeviceController.SetSfxVolume(ping.SfxId, leftVolume, rightVolume);
+        leftVolume *= configuration.MasterVolume;
+        rightVolume *= configuration.MasterVolume;
+        audioDeviceController.SetSfxVolume(ping.SfxId, leftVolume, rightVolume);
     }
 
     public void Dispose()
     {
         isDisposed = true;
         this.updateTimer.Dispose();
-        GC.SuppressFinalize(this);
     }
 
     private void UpdatePingVolumes()
     {
         try
         {
-            foreach (var ping in this.groundPingPresenter.GroundPings)
+            foreach (var ping in groundPingPresenter.GroundPings)
             {
                 UpdatePingVolume(ping);
             }
@@ -95,9 +73,9 @@ public class Spatializer : IDisposable
         out float volume)
     {
         Vector3 toTarget;
-        if (this.clientState.LocalPlayer != null)
+        if (dalamud.ClientState.LocalPlayer != null)
         {
-            toTarget = position - this.clientState.LocalPlayer.Position;
+            toTarget = position - dalamud.ClientState.LocalPlayer.Position;
         }
         else
         {
@@ -107,7 +85,7 @@ public class Spatializer : IDisposable
 
         volume = leftVolume = rightVolume = CalculateVolume(distance);
 
-        if (this.configuration.EnableSpatialization)
+        if (configuration.EnableSpatialization)
         {
             SpatializeVolume(volume, toTarget, out leftVolume, out rightVolume);
         }
@@ -116,14 +94,14 @@ public class Spatializer : IDisposable
     private float CalculateVolume(float distance)
     {
         return 1;
-        //var minDistance = this.configuration.FalloffModel.MinimumDistance;
-        //var maxDistance = this.configuration.FalloffModel.MaximumDistance;
-        //var falloffFactor = this.configuration.FalloffModel.FalloffFactor;
+        //var minDistance = configuration.FalloffModel.MinimumDistance;
+        //var maxDistance = configuration.FalloffModel.MaximumDistance;
+        //var falloffFactor = configuration.FalloffModel.FalloffFactor;
         //float volume;
         //try
         //{
         //    float scale;
-        //    switch (this.configuration.FalloffModel.Type)
+        //    switch (configuration.FalloffModel.Type)
         //    {
         //        case AudioFalloffModel.FalloffType.None:
         //            volume = 1.0f;
@@ -187,7 +165,7 @@ public class Spatializer : IDisposable
         if (float.IsNaN(angle)) { angle = 0f; }
         if (sine < 0) { angle = -angle; }
 
-        var minDistance = this.configuration.SpatializationMinimumDistance;
+        var minDistance = configuration.SpatializationMinimumDistance;
         float pan = 1;
         if (minDistance > 0 && distance < minDistance)
         {
