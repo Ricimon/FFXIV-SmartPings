@@ -44,6 +44,8 @@ Keybinds are adjustable in the plugin config settings, which can be opened by ty
 To send and receive pings from other players, join either a public or private room.<br />
 A public room will automatically match you with players in your map, while private rooms are password protected and keeps your room between map changes.
 
+Ground pings have accompanying sound effects, which can be adjusted in the plugin config settings.
+
 UI pings are sent through echo chat by default, but can be configured to send through in-game chat, such as party chat. However, use this feature with caution, as in-game chat logs are recorded by Square Enix.
 
 Currently supported UI pings:
