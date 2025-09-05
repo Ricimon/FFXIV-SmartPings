@@ -41,11 +41,32 @@ public class MainWindowPresenter(
         Bind(view.PublicRoom,
             b => { configuration.PublicRoom = b; configuration.Save(); }, configuration.PublicRoom);
         Bind(view.RoomName,
-            s => { configuration.RoomName = s; configuration.Save(); }, configuration.RoomName);
+            s =>
+            {
+                // Make sure the user doesn't automatically connect to rooms they didn't explicity say yes to.
+                if (s != configuration.RoomName || string.IsNullOrEmpty(s))
+                {
+                    configuration.AutoJoinPrivateRoomOnLogin = false;
+                }
+                configuration.RoomName = s;
+                configuration.Save();
+            }, configuration.RoomName);
         Bind(view.RoomPassword,
-            s => { configuration.RoomPassword = s; configuration.Save(); }, configuration.RoomPassword);
-        Bind(view.AutoJoinPrivateRoomOnLogin,
-            b => { configuration.AutoJoinPrivateRoomOnLogin = b; configuration.Save(); }, configuration.AutoJoinPrivateRoomOnLogin);
+            s =>
+            {
+                // Make sure the user doesn't automatically connect to rooms they didn't explicity say yes to.
+                if (s != configuration.RoomPassword || string.IsNullOrEmpty(s))
+                {
+                    configuration.AutoJoinPrivateRoomOnLogin = false;
+                }
+                configuration.RoomPassword = s;
+                configuration.Save();
+            }, configuration.RoomPassword);
+        view.AutoJoinPrivateRoomOnLogin.Subscribe(b =>
+        {
+            configuration.AutoJoinPrivateRoomOnLogin = b;
+            configuration.Save();
+        });
 
         Bind(view.EnableGroundPings,
             b => { configuration.EnableGroundPings = b; configuration.Save(); }, configuration.EnableGroundPings);
@@ -194,7 +215,7 @@ public class MainWindowPresenter(
                 if (target != null)
                 {
                     logger.Info("Target id {0}, name {1}", targetId, target->NameString);
-                    foreach(var targetStatus in target->StatusManager.Status)
+                    foreach (var targetStatus in target->StatusManager.Status)
                     {
                         if (targetStatus.StatusId == 0) { continue; }
                         var luminaStatuses = dalamud.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Status>(dalamud.ClientState.ClientLanguage);

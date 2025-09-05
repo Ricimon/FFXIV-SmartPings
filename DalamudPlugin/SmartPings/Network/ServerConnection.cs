@@ -51,26 +51,27 @@ public sealed class ServerConnection : IDisposable
     private readonly DalamudServices dalamud;
     private readonly MapManager mapManager;
     private readonly Lazy<GroundPingPresenter> groundPingPresenter;
+    private readonly Configuration configuration; // client plugin settings
     private readonly ILogger logger;
 
     private readonly LoadConfig loadConfig; // server URL and key
-    private readonly Configuration configuration; // client plugin settings
 
     private string? localPlayerFullName;
     private string[]? playersInRoom;
+    private bool isAutoJoin;
 
     public ServerConnection(
         DalamudServices dalamud,
         MapManager mapManager,
         Lazy<GroundPingPresenter> groundPingPresenter,
-        ILogger logger,
-        Configuration configuration)
+        Configuration configuration,
+        ILogger logger)
     {
         this.dalamud = dalamud;
         this.mapManager = mapManager;
         this.groundPingPresenter = groundPingPresenter;
-        this.logger = logger;
         this.configuration = configuration;
+        this.logger = logger;
 
         var configPath = Path.Combine(this.dalamud.PluginInterface.AssemblyLocation.DirectoryName ?? string.Empty, "config.json");
         this.loadConfig = null!;
@@ -96,8 +97,8 @@ public sealed class ServerConnection : IDisposable
     public void Dispose()
     {
         this.Channel?.Dispose();
-        this.dalamud.ClientState.Logout -= OnLogout;
         this.dalamud.ClientState.Login -= OnLogin;
+        this.dalamud.ClientState.Logout -= OnLogout;
     }
 
     public void JoinPublicRoom()
@@ -141,6 +142,7 @@ public sealed class ServerConnection : IDisposable
         this.InRoom = false;
         this.localPlayerFullName = null;
         this.playersInRoom = null;
+        this.isAutoJoin = false;
 
         //if (this.configuration.PlayRoomJoinAndLeaveSounds)
         //{
@@ -158,11 +160,8 @@ public sealed class ServerConnection : IDisposable
 
         if (this.Channel != null)
         {
-            //this.Channel.OnConnected -= OnSignalingServerConnected;
-            //this.Channel.OnReady -= OnSignalingServerReady;
-            //this.Channel.OnDisconnected -= OnSignalingServerDisconnected;
-            //this.Channel.OnErrored -= OnSignalingServerDisconnected;
             this.Channel.OnMessage -= OnMessage;
+            this.Channel.OnDisconnected -= OnDisconnect;
             return this.Channel.DisconnectAsync();
         }
         else
@@ -206,23 +205,25 @@ public sealed class ServerConnection : IDisposable
         });
     }
 
-    private void OnLogout(int type, int code)
-    {
-        LeaveRoom(false);
-    }
-
     private void OnLogin()
     {
-        if (configuration.AutoJoinPrivateRoomOnLogin)
+        if (this.configuration.AutoJoinPrivateRoomOnLogin)
         {
-            if (string.IsNullOrEmpty(configuration.RoomName) ||
-                string.IsNullOrEmpty(configuration.RoomPassword))
+            if (string.IsNullOrEmpty(this.configuration.RoomName) ||
+                string.IsNullOrEmpty(this.configuration.RoomPassword))
             {
                 this.logger.Warn("No private room credentials found to auto-join.");
                 return;
             }
-            JoinPrivateRoom(configuration.RoomName, configuration.RoomPassword);
+            this.isAutoJoin = true;
+            this.dalamud.ChatGui.Print($"Auto-joining {this.configuration.RoomName}'s room.", PluginInitializer.Name);
+            JoinPrivateRoom(this.configuration.RoomName, this.configuration.RoomPassword);
         }
+    }
+
+    private void OnLogout(int type, int code)
+    {
+        LeaveRoom(false);
     }
 
     private IEnumerable<string> GetOtherPlayerNamesInInstance()
@@ -276,6 +277,7 @@ public sealed class ServerConnection : IDisposable
         }
 
         this.Channel.OnMessage += OnMessage;
+        this.Channel.OnDisconnected += OnDisconnect;
 
         this.logger.Debug("Attempting to connect to server.");
         this.Channel.ConnectAsync(roomName, roomPassword, playersInInstance).SafeFireAndForget(ex =>
@@ -337,6 +339,17 @@ public sealed class ServerConnection : IDisposable
                 PrintChatMessage(payload.chatMessagePayload);
                 break;
         }
+    }
+
+    private void OnDisconnect()
+    {
+        if (this.isAutoJoin)
+        {
+            this.dalamud.ChatGui.PrintError($"Failed to auto join {this.configuration.RoomName}'s room.", PluginInitializer.Name);
+            this.configuration.AutoJoinPrivateRoomOnLogin = false;
+            this.configuration.Save();
+        }
+        this.isAutoJoin = false;
     }
 
     private void AddGroundPing(ServerMessage.Payload.GroundPingPayload payload)

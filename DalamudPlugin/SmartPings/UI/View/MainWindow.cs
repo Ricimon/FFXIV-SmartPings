@@ -34,7 +34,8 @@ public class MainWindow : Window, IPluginUIView, IDisposable
     public IReactiveProperty<bool> PublicRoom { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<string> RoomName { get; } = new ReactiveProperty<string>(string.Empty);
     public IReactiveProperty<string> RoomPassword { get; } = new ReactiveProperty<string>(string.Empty);
-    public IReactiveProperty<bool> AutoJoinPrivateRoomOnLogin { get; } = new ReactiveProperty<bool>();
+    public IObservable<bool> AutoJoinPrivateRoomOnLogin => autoJoinPrivateRoomOnLogin;
+    private readonly Subject<bool> autoJoinPrivateRoomOnLogin = new();
 
     private readonly Subject<Unit> joinRoom = new();
     public IObservable<Unit> JoinRoom => joinRoom.AsObservable();
@@ -224,11 +225,6 @@ public class MainWindow : Window, IPluginUIView, IDisposable
 
         if (ImGui.InputText("Room Name", ref roomName, 100, ImGuiInputTextFlags.AutoSelectAll | readOnlyIfInRoom))
         {
-            if (roomName != this.RoomName.Value)
-            {
-                this.AutoJoinPrivateRoomOnLogin.Value = false; // we want to make sure the user doesn't automatically connect to rooms they didn't explicity say yes to.
-            }
-
             this.RoomName.Value = roomName;
         }
         ImGui.SameLine(); Common.HelpMarker("Leave blank to join your own room");
@@ -246,33 +242,32 @@ public class MainWindow : Window, IPluginUIView, IDisposable
             {
                 roomPassword = "0" + roomPassword;
             }
-            if (roomPassword != this.RoomPassword.Value)
-            {
-                this.AutoJoinPrivateRoomOnLogin.Value = false; // we want to make sure the user doesn't automatically connect to rooms they didn't explicity say yes to.
-            }
-
             this.RoomPassword.Value = roomPassword;
         }
         ImGui.SameLine(); Common.HelpMarker("Sets the password if joining your own room");
 
-        bool AutoJoinPrivateRoomOnLogin = this.AutoJoinPrivateRoomOnLogin.Value;
-        if (ImGui.Checkbox("Automatically join room when logging in?", ref AutoJoinPrivateRoomOnLogin))
+        using (ImRaii.Disabled(string.IsNullOrEmpty(roomName)))
         {
-            this.AutoJoinPrivateRoomOnLogin.Value = AutoJoinPrivateRoomOnLogin;
+            bool autoJoinPrivateRoomOnLogin = this.configuration.AutoJoinPrivateRoomOnLogin;
+            if (ImGui.Checkbox("Auto-join on login", ref autoJoinPrivateRoomOnLogin))
+            {
+                this.autoJoinPrivateRoomOnLogin.OnNext(autoJoinPrivateRoomOnLogin);
+            }
         }
 
-        ImGui.BeginDisabled(this.serverConnection.InRoom);
-        if (this.createPrivateRoomButtonText == null || !this.serverConnection.InRoom)
+        using (ImRaii.Disabled(this.serverConnection.InRoom))
         {
-            var playerName = this.dalamud.ClientState.GetLocalPlayerFullName();
-            this.createPrivateRoomButtonText = roomName.Length == 0 || roomName == playerName ?
-                "Create Private Room" : "Join Private Room";
+            if (this.createPrivateRoomButtonText == null || !this.serverConnection.InRoom)
+            {
+                var playerName = this.dalamud.ClientState.GetLocalPlayerFullName();
+                this.createPrivateRoomButtonText = roomName.Length == 0 || roomName == playerName ?
+                    "Create Private Room" : "Join Private Room";
+            }
+            if (ImGui.Button(this.createPrivateRoomButtonText))
+            {
+                this.joinRoom.OnNext(Unit.Default);
+            }
         }
-        if (ImGui.Button(this.createPrivateRoomButtonText))
-        {
-            this.joinRoom.OnNext(Unit.Default);
-        }
-        ImGui.EndDisabled();
 
         var dcMsg = this.serverConnection.Channel?.LatestServerDisconnectMessage;
         if (dcMsg != null)

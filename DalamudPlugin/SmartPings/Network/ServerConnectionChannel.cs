@@ -1,18 +1,18 @@
-﻿using AsyncAwaitBestPractices;
-using SmartPings.Log;
-using SocketIO.Serializer.SystemTextJson;
-using SocketIOClient;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using AsyncAwaitBestPractices;
+using SmartPings.Log;
+using SocketIO.Serializer.SystemTextJson;
+using SocketIOClient;
 
 namespace SmartPings.Network;
 
-public class ServerConnectionChannel : IDisposable
+public sealed class ServerConnectionChannel : IDisposable
 {
     // Since Dalamud 12, for some reason accessing socket parameters such as socket.Connected from the UI thread
     // would crash the game. So, intermediate field booleans are now used to indicate state to the UI.
@@ -165,7 +165,6 @@ public class ServerConnectionChannel : IDisposable
         this.OnMessage = null;
         this.OnDisconnected = null;
         this.DisposeSocket();
-        GC.SuppressFinalize(this);
     }
 
     private void AddListeners()
