@@ -53,7 +53,8 @@ public sealed class ServerConnection : IDisposable
     private readonly Lazy<GroundPingPresenter> groundPingPresenter;
     private readonly ILogger logger;
 
-    private readonly LoadConfig loadConfig;
+    private readonly LoadConfig loadConfig; // server URL and key
+    private readonly Configuration configuration; // client plugin settings
 
     private string? localPlayerFullName;
     private string[]? playersInRoom;
@@ -62,12 +63,14 @@ public sealed class ServerConnection : IDisposable
         DalamudServices dalamud,
         MapManager mapManager,
         Lazy<GroundPingPresenter> groundPingPresenter,
-        ILogger logger)
+        ILogger logger,
+        Configuration configuration)
     {
         this.dalamud = dalamud;
         this.mapManager = mapManager;
         this.groundPingPresenter = groundPingPresenter;
         this.logger = logger;
+        this.configuration = configuration;
 
         var configPath = Path.Combine(this.dalamud.PluginInterface.AssemblyLocation.DirectoryName ?? string.Empty, "config.json");
         this.loadConfig = null!;
@@ -86,6 +89,7 @@ public sealed class ServerConnection : IDisposable
             this.loadConfig = new();
         }
 
+        this.dalamud.ClientState.Login += OnLogin;
         this.dalamud.ClientState.Logout += OnLogout;
     }
 
@@ -93,6 +97,7 @@ public sealed class ServerConnection : IDisposable
     {
         this.Channel?.Dispose();
         this.dalamud.ClientState.Logout -= OnLogout;
+        this.dalamud.ClientState.Login -= OnLogin;
     }
 
     public void JoinPublicRoom()
@@ -204,6 +209,20 @@ public sealed class ServerConnection : IDisposable
     private void OnLogout(int type, int code)
     {
         LeaveRoom(false);
+    }
+
+    private void OnLogin()
+    {
+        if (configuration.AutoJoinPrivateRoomOnLogin)
+        {
+            if (string.IsNullOrEmpty(configuration.RoomName) ||
+                string.IsNullOrEmpty(configuration.RoomPassword))
+            {
+                this.logger.Warn("No private room credentials found to auto-join.");
+                return;
+            }
+            JoinPrivateRoom(configuration.RoomName, configuration.RoomPassword);
+        }
     }
 
     private IEnumerable<string> GetOtherPlayerNamesInInstance()
