@@ -34,6 +34,7 @@ public class MainWindow : Window, IPluginUIView, IDisposable
     public IReactiveProperty<bool> PublicRoom { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<string> RoomName { get; } = new ReactiveProperty<string>(string.Empty);
     public IReactiveProperty<string> RoomPassword { get; } = new ReactiveProperty<string>(string.Empty);
+    public IReactiveProperty<bool> RoomLoginOnLaunch { get; } = new ReactiveProperty<bool>();
 
     private readonly Subject<Unit> joinRoom = new();
     public IObservable<Unit> JoinRoom => joinRoom.AsObservable();
@@ -223,6 +224,11 @@ public class MainWindow : Window, IPluginUIView, IDisposable
 
         if (ImGui.InputText("Room Name", ref roomName, 100, ImGuiInputTextFlags.AutoSelectAll | readOnlyIfInRoom))
         {
+            if (roomName != this.RoomName.Value)
+            {
+                this.RoomLoginOnLaunch.Value = false; // we want to make sure the user doesn't automatically connect to rooms they didn't explicity say yes to.
+            }
+
             this.RoomName.Value = roomName;
         }
         ImGui.SameLine(); Common.HelpMarker("Leave blank to join your own room");
@@ -240,9 +246,20 @@ public class MainWindow : Window, IPluginUIView, IDisposable
             {
                 roomPassword = "0" + roomPassword;
             }
+            if (roomPassword != this.RoomPassword.Value)
+            {
+                this.RoomLoginOnLaunch.Value = false; // we want to make sure the user doesn't automatically connect to rooms they didn't explicity say yes to.
+            }
+
             this.RoomPassword.Value = roomPassword;
         }
         ImGui.SameLine(); Common.HelpMarker("Sets the password if joining your own room");
+
+        bool roomLoginOnLaunch = this.RoomLoginOnLaunch.Value;
+        if (ImGui.Checkbox("Automatically join room when logging in?", ref roomLoginOnLaunch))
+        {
+            this.RoomLoginOnLaunch.Value = roomLoginOnLaunch;
+        }
 
         ImGui.BeginDisabled(this.serverConnection.InRoom);
         if (this.createPrivateRoomButtonText == null || !this.serverConnection.InRoom)

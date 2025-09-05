@@ -44,6 +44,8 @@ public class MainWindowPresenter(
             s => { configuration.RoomName = s; configuration.Save(); }, configuration.RoomName);
         Bind(view.RoomPassword,
             s => { configuration.RoomPassword = s; configuration.Save(); }, configuration.RoomPassword);
+        Bind(view.RoomLoginOnLaunch,
+            b => { configuration.RoomLoginOnLaunch = b; configuration.Save(); }, configuration.RoomLoginOnLaunch);
 
         Bind(view.EnableGroundPings,
             b => { configuration.EnableGroundPings = b; configuration.Save(); }, configuration.EnableGroundPings);

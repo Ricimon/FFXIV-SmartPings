@@ -17,6 +17,7 @@ namespace SmartPings
         public bool PublicRoom { get; set; }
         public string RoomName { get; set; } = string.Empty;
         public string RoomPassword { get; set; } = string.Empty;
+        public bool RoomLoginOnLaunch { get; set; } = false;
 
         public int SelectedAudioOutputDeviceIndex { get; set; } = -1;
 
