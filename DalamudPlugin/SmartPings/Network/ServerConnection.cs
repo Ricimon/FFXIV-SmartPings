@@ -213,14 +213,14 @@ public sealed class ServerConnection : IDisposable
 
     private void OnLogin()
     {
-        if (configuration.RoomName == null || configuration.RoomPassword == null || configuration.RoomPassword.Length < 4)
+        if (configuration.AutoJoinPrivateRoomOnLogin)
         {
-            dalamud.Log.Error("Failed to automatically join private room! Room data invalid.");
-            return;
-        }
-
-        if (configuration.RoomLoginOnLaunch)
-        {
+            if (string.IsNullOrEmpty(configuration.RoomName) ||
+                string.IsNullOrEmpty(configuration.RoomPassword))
+            {
+                this.logger.Warn("No private room credentials found to auto-join.");
+                return;
+            }
             JoinPrivateRoom(configuration.RoomName, configuration.RoomPassword);
         }
     }
