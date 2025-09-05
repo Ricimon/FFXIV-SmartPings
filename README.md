@@ -59,7 +59,6 @@ Currently supported UI pings:
 
 - On-my-way ping
 - Sound effects for default sound pack
-- Auto-join room on login
 
 ## Contributing
 Please use the support discord for idea and code contribution discussion.
