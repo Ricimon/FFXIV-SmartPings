@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Text;
+using System.Text.RegularExpressions;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Keys;
 using Dalamud.Interface.Utility.Raii;
@@ -18,10 +18,11 @@ using SmartPings.Input;
 using SmartPings.Log;
 using SmartPings.Network;
 using SmartPings.UI.Util;
+using ZLinq;
 
 namespace SmartPings.UI.View;
 
-public class MainWindow : Window, IPluginUIView, IDisposable
+public sealed class MainWindow : Window, IPluginUIView, IDisposable
 {
     // this extra bool exists for ImGui, since you can't ref a property
     private bool visible = false;
@@ -117,17 +118,18 @@ public class MainWindow : Window, IPluginUIView, IDisposable
         if (version.Length > 0)
         {
             var versionArray = version.Split(".");
-            version = string.Join(".", versionArray.Take(3));
+            version = versionArray.AsValueEnumerable().Take(3).JoinToString(".");
             this.windowName += $" v{version}";
         }
 #if DEBUG
         this.windowName += " (DEBUG)";
 #endif
-        this.groundPingTypes = Enum.GetNames<GroundPing.Type>();
+        this.groundPingTypes = Enum.GetNames<GroundPing.Type>().AsValueEnumerable()
+            .Select(s => Regex.Replace(s, "(\\B[A-Z])", " $1")).ToArray();
         this.soundPacks = Enum.GetNames<PingSounds.Pack>();
         this.xivChatSendLocations = Enum.GetNames<XivChatSendLocation>();
         this.falloffTypes = Enum.GetNames<AudioFalloffModel.FalloffType>();
-        this.allLoggingLevels = [.. LogLevel.AllLoggingLevels.Select(l => l.Name)];
+        this.allLoggingLevels = LogLevel.AllLoggingLevels.AsValueEnumerable().Select(l => l.Name).ToArray();
         windowSystem.AddWindow(this);
 
 #if DEBUG
@@ -156,7 +158,6 @@ public class MainWindow : Window, IPluginUIView, IDisposable
     public void Dispose()
     {
         windowSystem.RemoveWindow(this);
-        GC.SuppressFinalize(this);
     }
 
     private void DrawContents()
@@ -322,7 +323,7 @@ public class MainWindow : Window, IPluginUIView, IDisposable
         var indent = 10;
         ImGui.Indent(indent);
 
-        foreach (var (playerName, index) in this.serverConnection.PlayersInRoom.Select((p, i) => (p, i)))
+        foreach (var (playerName, index) in this.serverConnection.PlayersInRoom.AsValueEnumerable().Select((p, i) => (p, i)))
         {
             Vector4 color = Vector4Colors.Red;
             string tooltip = "Connection Error";
