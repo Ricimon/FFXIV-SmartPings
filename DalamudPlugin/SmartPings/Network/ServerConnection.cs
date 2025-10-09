@@ -11,6 +11,7 @@ using SmartPings.Data;
 using SmartPings.Extensions;
 using SmartPings.Log;
 using SocketIOClient;
+using ZLinq;
 
 namespace SmartPings.Network;
 
@@ -353,6 +354,10 @@ public sealed class ServerConnection : IDisposable
                 {
                     EchoUiPing(payload.uiPingPayload.Value);
                 }
+                break;
+            case ServerMessage.Payload.Action.Close:
+                // Temp logic to update the player list before the server gets fixed to send a player list update
+                this.playersInRoom = this.playersInRoom?.AsValueEnumerable().Where(p => p != message.from).ToArray();
                 break;
         }
     }

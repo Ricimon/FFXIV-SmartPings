@@ -158,6 +158,7 @@ public sealed class ServerConnectionChannel : IDisposable
 
     public void Dispose()
     {
+        DisconnectAsync();
         this.OnConnected = null;
         this.OnReady = null;
         this.OnMessage = null;

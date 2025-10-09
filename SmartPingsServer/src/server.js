@@ -273,6 +273,7 @@ io.on("connection", (socket) => {
     const disconnectingPeer = Object.values(connections).find((peer) => peer.socketId === socket.id);
     if (disconnectingPeer) {
       logger.info(`(${socket.id}) Disconnected peerId ${disconnectingPeer.peerId} from room ${socket.room}`);
+      // TODO: REPLACE Action.Close WITH Action.UpdatePlayersInRoom
       // Make all peers close their peer channels
       socket.to(socket.room).emit("message", {
         from: disconnectingPeer.peerId,
