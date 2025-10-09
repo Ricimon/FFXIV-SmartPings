@@ -72,7 +72,10 @@ public sealed class ServerConnectionChannel : IDisposable
 
             this.socket = new SocketIOClient.SocketIO(serverUrl, socketOptions)
             {
-                Serializer = new NewtonsoftJsonSerializer()
+                Serializer = new NewtonsoftJsonSerializer(new JsonSerializerSettings
+                {
+                    NullValueHandling = NullValueHandling.Ignore,
+                }),
             };
             this.AddListeners();
         }

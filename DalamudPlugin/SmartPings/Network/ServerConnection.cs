@@ -326,7 +326,7 @@ public sealed class ServerConnection : IDisposable
             message = response.GetValue<ServerMessage>();
             payload = message.payload;
         }
-        catch(JsonException jsonEx)
+        catch (JsonException jsonEx)
         {
             this.logger.Error("Failed to read server JSON data. You may need to update the plugin. Error:\n{0}", jsonEx.ToString());
             return;
@@ -343,10 +343,16 @@ public sealed class ServerConnection : IDisposable
                 this.playersInRoom = payload.players;
                 break;
             case ServerMessage.Payload.Action.AddGroundPing:
-                AddGroundPing(payload.groundPingPayload);
+                if (payload.groundPingPayload.HasValue)
+                {
+                    AddGroundPing(payload.groundPingPayload.Value);
+                }
                 break;
             case ServerMessage.Payload.Action.SendUiPing:
-                EchoUiPing(payload.uiPingPayload);
+                if (payload.uiPingPayload.HasValue)
+                {
+                    EchoUiPing(payload.uiPingPayload.Value);
+                }
                 break;
         }
     }

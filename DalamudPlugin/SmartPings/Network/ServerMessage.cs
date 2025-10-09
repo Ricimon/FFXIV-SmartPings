@@ -36,9 +36,9 @@ public struct ServerMessage
         }
 
         public Action action;
-        public string[] players;
-        public GroundPingPayload groundPingPayload;
-        public UiPingPayload uiPingPayload;
+        public string[]? players;
+        public GroundPingPayload? groundPingPayload;
+        public UiPingPayload? uiPingPayload;
     }
 
     public string from;
