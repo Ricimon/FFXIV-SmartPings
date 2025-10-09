@@ -27,6 +27,12 @@ public unsafe class GuiPingHandler(
     Configuration configuration,
     ILogger logger)
 {
+    public enum UiPingType
+    {
+        Echo,
+        Chat,
+    }
+
     private const ushort BLUE = 542;
     private const ushort LIGHT_BLUE = 529;
     private const ushort YELLOW = 25;
@@ -68,6 +74,137 @@ public unsafe class GuiPingHandler(
         return default;
     }
 
+    public static Tuple<SeStringBuilder?, StringBuilder?> CreateUiPingString(UiPingType pingType, string? sourceName, HudElementInfo info)
+    {
+        SeStringBuilder? echoMsg = null;
+        StringBuilder? chatMsg = null;
+        if (pingType == UiPingType.Echo)
+        {
+            echoMsg = new();
+        }
+        else if (pingType == UiPingType.Chat)
+        {
+            chatMsg = new();
+        }
+        else
+        {
+            return new(null, null);
+        }
+
+        // Source name -------------
+        if (!string.IsNullOrEmpty(sourceName))
+        {
+            echoMsg?.AddUiForeground($"({sourceName}) ", BLUE);
+        }
+        else
+        {
+            return new(null, null);
+        }
+
+        // Target name -------------
+        if (!info.IsOnSelf)
+        {
+            echoMsg?.AddUiForeground($"{info.OwnerName}: ", info.IsOnHostile ? RED : LIGHT_BLUE);
+
+            chatMsg?.Append($"{info.OwnerName}: ");
+        }
+
+        if (info.ElementType == HudElementInfo.Type.Status)
+        {
+            var isRealStatus = info.Status.Id > 0;
+
+            // Status name --------------
+            if (isRealStatus)
+            {
+                echoMsg?.AddStatusLink(info.Status.Id);
+                // This is how status links are normally constructed
+                echoMsg?.AddUiForeground(500);
+                echoMsg?.AddUiGlow(501);
+                echoMsg?.Append(SeIconChar.LinkMarker.ToIconString());
+                echoMsg?.AddUiGlowOff();
+                echoMsg?.AddUiForegroundOff();
+            }
+            if (info.Status.IsEnfeeblement)
+            {
+                echoMsg?.AddUiForeground(518);
+                echoMsg?.Append(SeIconChar.Debuff.ToIconString());
+                echoMsg?.AddUiForegroundOff();
+            }
+            else
+            {
+                echoMsg?.AddUiForeground(517);
+                echoMsg?.Append(SeIconChar.Buff.ToIconString());
+                echoMsg?.AddUiForegroundOff();
+            }
+            var beneficial = info.IsOnHostile == info.Status.IsEnfeeblement;
+            echoMsg?.AddUiForeground($"{info.Status.Name}", beneficial ? YELLOW : RED);
+            if (isRealStatus) { echoMsg?.Append([RawPayload.LinkTerminator]); }
+
+            chatMsg?.Append(isRealStatus ? "<status>" : info.Status.Name);
+
+            if (info.Status.MaxStacks > 0)
+            {
+                echoMsg?.AddUiForeground($" x{info.Status.Stacks}", beneficial ? YELLOW : RED);
+
+                chatMsg?.Append($" x{info.Status.Stacks}");
+            }
+
+            // Timer ---------------
+            if (info.Status.RemainingTime > 0)
+            {
+                echoMsg?.AddUiForeground(" - ", YELLOW);
+                var remainingTime = info.Status.RemainingTime >= 1 ?
+                    MathF.Floor(info.Status.RemainingTime).ToString() :
+                    info.Status.RemainingTime.ToString("F1");
+                echoMsg?.AddUiForeground($"{remainingTime}s", GREEN);
+
+                chatMsg?.Append($" - {remainingTime}s");
+            }
+        }
+        else if (info.ElementType == HudElementInfo.Type.Hp)
+        {
+            var hpPercent = (float)info.Hp.Value / info.Hp.MaxValue * 100;
+            hpPercent = MathF.Floor(hpPercent * 10) / 10;
+            var hpString = hpPercent == 100 ? hpPercent.ToString("F0") : hpPercent.ToString("F1");
+            if (hpString == "0.0" && hpPercent > 0) { hpString = "0.1"; }
+            echoMsg?.AddUiForeground($"HP: {hpString}%", hpPercent < 10 ? RED : YELLOW);
+            if (info.IsOnPartyMember || info.IsOnSelf)
+            {
+                echoMsg?.AddUiForeground($" ({info.Hp.Value:N0}/{info.Hp.MaxValue:N0})", GREEN);
+            }
+
+            chatMsg?.Append($"HP: {hpString}%");
+            if (info.IsOnPartyMember || info.IsOnSelf)
+            {
+                chatMsg?.Append($" ({info.Hp.Value:N0}/{info.Hp.MaxValue:N0})");
+            }
+        }
+        else if (info.ElementType == HudElementInfo.Type.Mp)
+        {
+            var mpPercent = (float)info.Mp.Value / info.Mp.MaxValue * 100;
+            mpPercent = MathF.Floor(mpPercent * 10) / 10;
+            var mpString = mpPercent == 100 ? mpPercent.ToString("F0") : mpPercent.ToString("F1");
+            if (mpString == "0.0" && mpPercent > 0) { mpString = "0.1"; }
+            echoMsg?.AddUiForeground($"MP: {mpString}%", mpPercent < 10 ? RED : YELLOW);
+            if (info.IsOnPartyMember || info.IsOnSelf)
+            {
+                echoMsg?.AddUiForeground($" ({info.Mp.Value:N0}/{info.Mp.MaxValue:N0})", GREEN);
+            }
+
+            chatMsg?.Append($"MP: {mpString}%");
+            if (info.IsOnPartyMember || info.IsOnSelf)
+            {
+                chatMsg?.Append($" ({info.Mp.Value:N0}/{info.Mp.MaxValue:N0})");
+            }
+        }
+        else
+        {
+            return new(null, null);
+        }
+
+        return new(echoMsg, chatMsg);
+    }
+
     public bool TryPingUi()
     {
         var collisionNode = AtkStage.Instance()->AtkCollisionManager->IntersectingCollisionNode;
@@ -85,145 +222,65 @@ public unsafe class GuiPingHandler(
 
         if (TryGetCollisionNodeElementInfo(collisionNode, out var info))
         {
-            var echoMsg = new SeStringBuilder();
-            var chatMsg = new StringBuilder();
+            ServerMessage.Payload.UiPingPayload uiPing = new()
+            {
+                sourceName = GetLocalPlayerName(),
+                hudElementInfo = info,
+            };
 
-            // Source name -------------
+            if (info.ElementType == HudElementInfo.Type.Hp ||
+                info.ElementType == HudElementInfo.Type.Mp)
+            {
+                ImGuiExtensions.CaptureMouseThisFrame();
+            }
+
             var localPlayerName = GetLocalPlayerName();
-            echoMsg.AddUiForeground($"({localPlayerName}) ", BLUE);
-
-            // Target name -------------
-            if (!info.IsOnSelf)
-            {
-                echoMsg.AddUiForeground($"{info.OwnerName}: ", info.IsOnHostile ? RED : LIGHT_BLUE);
-
-                chatMsg.Append($"{info.OwnerName}: ");
-            }
-
-            if (info.ElementType == HudElementInfo.Type.Status)
-            {
-                var isRealStatus = info.Status.Id > 0;
-
-                // Status name --------------
-                if (isRealStatus)
-                {
-                    echoMsg.AddStatusLink(info.Status.Id);
-                    // This is how status links are normally constructed
-                    echoMsg.AddUiForeground(500);
-                    echoMsg.AddUiGlow(501);
-                    echoMsg.Append(SeIconChar.LinkMarker.ToIconString());
-                    echoMsg.AddUiGlowOff();
-                    echoMsg.AddUiForegroundOff();
-                }
-                if (info.Status.IsEnfeeblement)
-                {
-                    echoMsg.AddUiForeground(518);
-                    echoMsg.Append(SeIconChar.Debuff.ToIconString());
-                    echoMsg.AddUiForegroundOff();
-                }
-                else
-                {
-                    echoMsg.AddUiForeground(517);
-                    echoMsg.Append(SeIconChar.Buff.ToIconString());
-                    echoMsg.AddUiForegroundOff();
-                }
-                var beneficial = info.IsOnHostile == info.Status.IsEnfeeblement;
-                echoMsg.AddUiForeground($"{info.Status.Name}", beneficial ? YELLOW : RED);
-                if (isRealStatus) { echoMsg.Append([RawPayload.LinkTerminator]); }
-
-                chatMsg.Append(isRealStatus ? "<status>" : info.Status.Name);
-
-                if (info.Status.MaxStacks > 0)
-                {
-                    echoMsg.AddUiForeground($" x{info.Status.Stacks}", beneficial ? YELLOW : RED);
-
-                    chatMsg.Append($" x{info.Status.Stacks}");
-                }
-
-                // Timer ---------------
-                if (info.Status.RemainingTime > 0)
-                {
-                    echoMsg.AddUiForeground(" - ", YELLOW);
-                    var remainingTime = info.Status.RemainingTime >= 1 ?
-                        MathF.Floor(info.Status.RemainingTime).ToString() :
-                        info.Status.RemainingTime.ToString("F1");
-                    echoMsg.AddUiForeground($"{remainingTime}s", GREEN);
-
-                    chatMsg.Append($" - {remainingTime}s");
-                }
-            }
-            else if (info.ElementType == HudElementInfo.Type.Hp)
-            {
-                var hpPercent = (float)info.Hp.Value / info.Hp.MaxValue * 100;
-                hpPercent = MathF.Floor(hpPercent * 10) / 10;
-                var hpString = hpPercent == 100 ? hpPercent.ToString("F0") : hpPercent.ToString("F1");
-                if (hpString == "0.0" && hpPercent > 0) { hpString = "0.1"; }
-                echoMsg.AddUiForeground($"HP: {hpString}%", hpPercent < 10 ? RED : YELLOW);
-                if (info.IsOnPartyMember || info.IsOnSelf)
-                {
-                    echoMsg.AddUiForeground($" ({info.Hp.Value:N0}/{info.Hp.MaxValue:N0})", GREEN);
-                }
-
-                chatMsg.Append($"HP: {hpString}%");
-                if (info.IsOnPartyMember || info.IsOnSelf)
-                {
-                    chatMsg.Append($" ({info.Hp.Value:N0}/{info.Hp.MaxValue:N0})");
-                }
-
-                ImGuiExtensions.CaptureMouseThisFrame();
-            }
-            else if (info.ElementType == HudElementInfo.Type.Mp)
-            {
-                var mpPercent = (float)info.Mp.Value / info.Mp.MaxValue * 100;
-                mpPercent = MathF.Floor(mpPercent * 10) / 10;
-                var mpString = mpPercent == 100 ? mpPercent.ToString("F0") : mpPercent.ToString("F1");
-                if (mpString == "0.0" && mpPercent > 0) { mpString = "0.1"; }
-                echoMsg.AddUiForeground($"MP: {mpString}%", mpPercent < 10 ? RED : YELLOW);
-                if (info.IsOnPartyMember || info.IsOnSelf)
-                {
-                    echoMsg.AddUiForeground($" ({info.Mp.Value:N0}/{info.Mp.MaxValue:N0})", GREEN);
-                }
-
-                chatMsg.Append($"MP: {mpString}%");
-                if (info.IsOnPartyMember || info.IsOnSelf)
-                {
-                    chatMsg.Append($" ({info.Mp.Value:N0}/{info.Mp.MaxValue:N0})");
-                }
-
-                ImGuiExtensions.CaptureMouseThisFrame();
-            }
 
             if (configuration.SendGuiPingsToXivChat)
             {
-                // This method must be called on a framework thread or else XIV will crash.
-                dalamud.Framework.Run(() =>
+                var chatMsg = CreateUiPingString(UiPingType.Chat, localPlayerName, info).Item2;
+                if (chatMsg != null)
                 {
-                    if (info.ElementType == HudElementInfo.Type.Status)
+                    // This method must be called on a framework thread or else XIV will crash.
+                    dalamud.Framework.Run(() =>
                     {
-                        AgentChatLog.Instance()->ContextStatusId = info.Status.Id;
-                    }
-                    if (configuration.XivChatSendLocation == XivChatSendLocation.Party)
-                    {
-                        chatMsg.Insert(0, "/party ");
-                    }
-                    chat.SendMessage(chatMsg.ToString());
-                });
+                        if (info.ElementType == HudElementInfo.Type.Status)
+                        {
+                            AgentChatLog.Instance()->ContextStatusId = info.Status.Id;
+                        }
+                        if (configuration.XivChatSendLocation == XivChatSendLocation.Party)
+                        {
+                            chatMsg.Insert(0, "/party ");
+                        }
+                        chat.SendMessage(chatMsg.ToString());
+                    });
+                }
             }
 
             if (configuration.SendGuiPingsToCustomServer)
             {
-                var xivMsg = new XivChatEntry
+                var echoMsg = CreateUiPingString(UiPingType.Echo, localPlayerName, info).Item1;
+                if (echoMsg != null)
                 {
-                    Type = XivChatType.Echo,
-                    Message = echoMsg.Build(),
-                };
-                dalamud.ChatGui.Print(xivMsg);
+                    EchoUiPing(echoMsg);
 
-                serverConnection.SendChatMessage(xivMsg);
+                    serverConnection.SendUiPing(localPlayerName, info);
+                }
             }
         }
 
         return true;
+    }
+
+    public void EchoUiPing(SeStringBuilder sb)
+    {
+        if (sb == null) { return; }
+        var xivMsg = new XivChatEntry
+        {
+            Type = XivChatType.Echo,
+            Message = sb.Build(),
+        };
+        dalamud.ChatGui.Print(xivMsg);
     }
 
     // To determine what status was clicked on, we need to go from AtkImageNode (inherits AtkCollisionNode) to Status information.

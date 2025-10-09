@@ -1,4 +1,5 @@
 ﻿using Dalamud.Game.Text;
+using SmartPings.Data;
 
 namespace SmartPings.Network;
 
@@ -11,7 +12,7 @@ public struct ServerMessage
             None = 0,
             UpdatePlayersInRoom = 1,
             AddGroundPing = 2,
-            SendChatMessage = 3,
+            SendUiPing = 3,
 
             Close = 10,
         }
@@ -27,16 +28,16 @@ public struct ServerMessage
             public float worldPositionZ;
         }
 
-        public struct ChatMessagePayload
+        public struct UiPingPayload
         {
-            public XivChatType chatType;
-            public byte[] message;
+            public string? sourceName;
+            public HudElementInfo hudElementInfo;
         }
 
         public Action action;
         public string[] players;
         public GroundPingPayload groundPingPayload;
-        public ChatMessagePayload chatMessagePayload;
+        public UiPingPayload uiPingPayload;
     }
 
     public string from;

@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using AsyncAwaitBestPractices;
 using Dalamud.Game.Text;
+using SmartPings.Data;
 using SmartPings.Extensions;
 using SmartPings.Log;
 using SocketIOClient;
@@ -51,6 +52,7 @@ public sealed class ServerConnection : IDisposable
     private readonly DalamudServices dalamud;
     private readonly MapManager mapManager;
     private readonly Lazy<GroundPingPresenter> groundPingPresenter;
+    private readonly Lazy<GuiPingHandler> guiPingHandler;
     private readonly Configuration configuration; // client plugin settings
     private readonly ILogger logger;
 
@@ -64,12 +66,14 @@ public sealed class ServerConnection : IDisposable
         DalamudServices dalamud,
         MapManager mapManager,
         Lazy<GroundPingPresenter> groundPingPresenter,
+        Lazy<GuiPingHandler> guiPingHandler,
         Configuration configuration,
         ILogger logger)
     {
         this.dalamud = dalamud;
         this.mapManager = mapManager;
         this.groundPingPresenter = groundPingPresenter;
+        this.guiPingHandler = guiPingHandler;
         this.configuration = configuration;
         this.logger = logger;
 
@@ -190,17 +194,17 @@ public sealed class ServerConnection : IDisposable
         }).SafeFireAndForget(ex => this.logger.Error(ex.ToString()));
     }
 
-    public void SendChatMessage(XivChatEntry chatEntry)
+    public void SendUiPing(string sourceName, HudElementInfo hudElementInfo)
     {
         if (this.Channel == null || !this.Channel.Connected) { return; }
 
         this.Channel.SendAsync(new ServerMessage.Payload
         {
-            action = ServerMessage.Payload.Action.SendChatMessage,
-            chatMessagePayload = new ServerMessage.Payload.ChatMessagePayload
+            action = ServerMessage.Payload.Action.SendUiPing,
+            uiPingPayload = new ServerMessage.Payload.UiPingPayload
             {
-                chatType = chatEntry.Type ?? XivChatType.None,
-                message = chatEntry.MessageBytes,
+                sourceName = sourceName,
+                hudElementInfo = hudElementInfo,
             }
         });
     }
@@ -335,8 +339,8 @@ public sealed class ServerConnection : IDisposable
             case ServerMessage.Payload.Action.AddGroundPing:
                 AddGroundPing(payload.groundPingPayload);
                 break;
-            case ServerMessage.Payload.Action.SendChatMessage:
-                PrintChatMessage(payload.chatMessagePayload);
+            case ServerMessage.Payload.Action.SendUiPing:
+                EchoUiPing(payload.uiPingPayload);
                 break;
         }
     }
@@ -370,13 +374,12 @@ public sealed class ServerConnection : IDisposable
         this.groundPingPresenter.Value.GroundPings.AddLast(ping);
     }
 
-    private void PrintChatMessage(ServerMessage.Payload.ChatMessagePayload payload)
+    private void EchoUiPing(ServerMessage.Payload.UiPingPayload payload)
     {
-        var xivMsg = new XivChatEntry
+        var echoMsg = GuiPingHandler.CreateUiPingString(GuiPingHandler.UiPingType.Echo, payload.sourceName, payload.hudElementInfo).Item1;
+        if (echoMsg != null)
         {
-            Type = payload.chatType,
-            MessageBytes = payload.message
-        };
-        this.dalamud.ChatGui.Print(xivMsg);
+            this.guiPingHandler.Value.EchoUiPing(echoMsg);
+        }
     }
 }
