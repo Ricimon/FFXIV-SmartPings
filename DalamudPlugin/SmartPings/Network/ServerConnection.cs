@@ -186,7 +186,7 @@ public sealed class ServerConnection : IDisposable
             {
                 pingType = ping.PingType,
                 author = ping.Author ?? string.Empty,
-                authorId = (long)ping.AuthorId,
+                authorId = ping.AuthorId.ToString(),
                 startTimestamp = ping.StartTimestamp,
                 mapId = ping.MapId ?? string.Empty,
                 worldPositionX = ping.WorldPosition.X,
@@ -379,7 +379,7 @@ public sealed class ServerConnection : IDisposable
         {
             PingType = payload.pingType,
             Author = payload.author,
-            AuthorId = (ulong)payload.authorId,
+            AuthorId = ulong.Parse(payload.authorId),
             StartTimestamp = payload.startTimestamp,
             MapId = payload.mapId,
             WorldPosition = new Vector3
