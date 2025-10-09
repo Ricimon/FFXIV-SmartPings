@@ -57,7 +57,6 @@ Currently supported UI pings:
 
 ## Todo
 
-- On-my-way ping
 - Sound effects for default sound pack
 
 ## Contributing
