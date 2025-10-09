@@ -21,6 +21,7 @@ public struct ServerMessage
         {
             public GroundPing.Type pingType;
             public string author;
+            // JavaScript (the server language) can only support up to 53-bit integers, so long/ulong need to be converted to raw byte arrays
             public byte[] authorId;
             public byte[] startTimestamp;
             public string mapId;
