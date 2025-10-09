@@ -70,8 +70,10 @@ public sealed class ServerConnectionChannel : IDisposable
                 socketOptions.Path = pathMatch.Groups[2].Value;
             }
 
-            this.socket = new SocketIOClient.SocketIO(serverUrl, socketOptions);
-            this.socket.Serializer = new NewtonsoftJsonSerializer();
+            this.socket = new SocketIOClient.SocketIO(serverUrl, socketOptions)
+            {
+                Serializer = new NewtonsoftJsonSerializer()
+            };
             this.AddListeners();
         }
 

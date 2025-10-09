@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Dalamud.NET.Sdk/13.0.0">
+<Project Sdk="Dalamud.NET.Sdk/13.1.0">
   <PropertyGroup>
     <Authors>Ricimon</Authors>
     <Company></Company>
@@ -21,12 +21,13 @@
 
   <ItemGroup>
     <PackageReference Include="AsyncAwaitBestPractices" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.9" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="Ninject" Version="3.3.6" />
     <PackageReference Include="Ninject.Extensions.Factory" Version="3.3.3" />
-    <PackageReference Include="NLog" Version="5.4.0" />
+    <PackageReference Include="NLog" Version="6.0.4" />
     <PackageReference Include="ReactiveProperty" Version="9.7.0" />
+    <PackageReference Include="SocketIO.Serializer.NewtonsoftJson" Version="3.1.2" />
     <PackageReference Include="SocketIOClient" Version="3.1.2" />
     <PackageReference Include="WindowsInput" Version="6.4.1" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
