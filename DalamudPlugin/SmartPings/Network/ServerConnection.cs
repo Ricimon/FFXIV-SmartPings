@@ -185,6 +185,7 @@ public sealed class ServerConnection : IDisposable
             {
                 pingType = ping.PingType,
                 author = ping.Author ?? string.Empty,
+                authorId = ping.AuthorId,
                 startTimestamp = ping.StartTimestamp,
                 mapId = ping.MapId ?? string.Empty,
                 worldPositionX = ping.WorldPosition.X,
@@ -325,6 +326,11 @@ public sealed class ServerConnection : IDisposable
             message = response.GetValue<ServerMessage>();
             payload = message.payload;
         }
+        catch(JsonException jsonEx)
+        {
+            this.logger.Error("Failed to read server JSON data. You may need to update the plugin. Error:\n{0}", jsonEx.ToString());
+            return;
+        }
         catch (Exception e)
         {
             this.logger.Error(e.ToString());
@@ -362,6 +368,7 @@ public sealed class ServerConnection : IDisposable
         {
             PingType = payload.pingType,
             Author = payload.author,
+            AuthorId = payload.authorId,
             StartTimestamp = payload.startTimestamp,
             MapId = payload.mapId,
             WorldPosition = new Vector3

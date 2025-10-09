@@ -21,6 +21,7 @@ public struct ServerMessage
         {
             public GroundPing.Type pingType;
             public string author;
+            public ulong authorId;
             public long startTimestamp;
             public string mapId;
             public float worldPositionX;
