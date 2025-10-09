@@ -241,12 +241,12 @@ public class GroundPingView : IPluginUIView
             {
                 ImGui.SetMouseCursor(ImGuiMouseCursor.None);
                 AtkStage.Instance()->AtkCursor.Hide();
-                DrawPingCursor(ImGui.GetForegroundDrawList(), ImGui.GetMousePos(), 50 * Vector2.One);
+                DrawPingCursor(ImGui.GetForegroundDrawList(), ImGui.GetMousePos(), 50 * configuration.UiScale * Vector2.One);
             }
             else if (this.IsAnyPingEnabled && IsQuickPingKeybindDown)
             {
-                var position = ImGui.GetMousePos() + new Vector2(14, 30);
-                DrawPingCursor(ImGui.GetForegroundDrawList(), position, 25 * Vector2.One);
+                var position = ImGui.GetMousePos() + configuration.UiScale * new Vector2(14, 30);
+                DrawPingCursor(ImGui.GetForegroundDrawList(), position, 25 * configuration.UiScale * Vector2.One);
             }
         }
 
@@ -363,7 +363,7 @@ public class GroundPingView : IPluginUIView
         int totalWidth = 1536;
         int totalHeight = 1024;
 
-        var size = PING_WHEEL_SIZE;
+        var size = PING_WHEEL_SIZE * configuration.UiScale;
         int frame;
         if (Vector2.Distance(wheelPosition, mousePosition) < PING_WHEEL_CENTER_SIZE_MULTIPLIER * size)
         {
@@ -508,6 +508,7 @@ public class GroundPingView : IPluginUIView
             ringSize.Y *= maxRingSize / ringSize.X;
             ringSize.X = maxRingSize;
         }
+        ringSize *= configuration.UiScale;
 
         float fps = 30;
         {

@@ -86,6 +86,9 @@ public class MainWindowPresenter(
         Bind(view.XivChatSendLocation,
             b => { configuration.XivChatSendLocation = b; configuration.Save(); }, configuration.XivChatSendLocation);
 
+        Bind(view.UiScale,
+            b => { configuration.UiScale = b; configuration.Save(); }, configuration.UiScale);
+
         Bind(view.SelectedAudioOutputDeviceIndex,
             i => audioDeviceController.AudioPlaybackDeviceIndex = i, audioDeviceController.AudioPlaybackDeviceIndex);
         Bind(view.MasterVolume,

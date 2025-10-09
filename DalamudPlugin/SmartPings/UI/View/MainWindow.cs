@@ -55,6 +55,7 @@ public sealed class MainWindow : Window, IPluginUIView, IDisposable
     public IReactiveProperty<bool> SendGuiPingsToCustomServer { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<bool> SendGuiPingsToXivChat { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<XivChatSendLocation> XivChatSendLocation { get; } = new ReactiveProperty<XivChatSendLocation>();
+    public IReactiveProperty<float> UiScale { get; } = new ReactiveProperty<float>();
 
     public IReactiveProperty<int> SelectedAudioOutputDeviceIndex { get; } = new ReactiveProperty<int>(-1);
     public IReactiveProperty<float> MasterVolume { get; } = new ReactiveProperty<float>();
@@ -528,6 +529,17 @@ public sealed class MainWindow : Window, IPluginUIView, IDisposable
                 {
                     this.XivChatSendLocation.Value = (XivChatSendLocation)xivChatSendLocation;
                 }
+            }
+        }
+
+        ImGui.Dummy(new Vector2(0.0f, 5.0f)); // ---------------
+
+        using (ImRaii.ItemWidth(200))
+        {
+            var uiScale = this.UiScale.Value * 100.0f;
+            if (ImGui.SliderFloat("Ping UI Scale", ref uiScale, 0.0f, 200.0f, "%1.0f%%"))
+            {
+                this.UiScale.Value = uiScale / 100.0f;
             }
         }
 

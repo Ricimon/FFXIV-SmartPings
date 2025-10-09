@@ -34,6 +34,8 @@ namespace SmartPings
         public bool SendGuiPingsToXivChat { get; set; }
         public XivChatSendLocation XivChatSendLocation { get; set; } = XivChatSendLocation.Active;
 
+        public float UiScale { get; set; } = 1.0f;
+
         public float MasterVolume { get; set; } = 1.0f;
         public int MaxConcurrentSfx { get; set; } = 5;
         public PingSounds.Pack ActiveSoundPack { get; set; } = PingSounds.Pack.Default;
