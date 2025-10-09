@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using AsyncAwaitBestPractices;
+using Newtonsoft.Json;
 using SmartPings.Log;
-using SocketIO.Serializer.SystemTextJson;
+using SocketIO.Serializer.NewtonsoftJson;
 using SocketIOClient;
 
 namespace SmartPings.Network;
@@ -72,13 +71,7 @@ public sealed class ServerConnectionChannel : IDisposable
             }
 
             this.socket = new SocketIOClient.SocketIO(serverUrl, socketOptions);
-            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
-            {
-                IncludeFields = true,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            };
-            options.Converters.Add(new JsonStringEnumConverter());
-            this.socket.Serializer = new SystemTextJsonSerializer(options);
+            this.socket.Serializer = new NewtonsoftJsonSerializer();
             this.AddListeners();
         }
 
