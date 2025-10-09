@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -6,7 +7,6 @@ using System.Numerics;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AsyncAwaitBestPractices;
-using Dalamud.Game.Text;
 using SmartPings.Data;
 using SmartPings.Extensions;
 using SmartPings.Log;
@@ -179,6 +179,11 @@ public sealed class ServerConnection : IDisposable
     {
         if (this.Channel == null || !this.Channel.Connected) { return; }
 
+        var authorId = new byte[8];
+        BinaryPrimitives.WriteUInt64BigEndian(authorId, ping.AuthorId);
+        var startTimestamp = new byte[8];
+        BinaryPrimitives.WriteInt64BigEndian(startTimestamp, ping.StartTimestamp);
+
         this.Channel.SendAsync(new ServerMessage.Payload
         {
             action = ServerMessage.Payload.Action.AddGroundPing,
@@ -186,8 +191,8 @@ public sealed class ServerConnection : IDisposable
             {
                 pingType = ping.PingType,
                 author = ping.Author ?? string.Empty,
-                authorId = ping.AuthorId.ToString(),
-                startTimestamp = ping.StartTimestamp,
+                authorId = authorId,
+                startTimestamp = startTimestamp,
                 mapId = ping.MapId ?? string.Empty,
                 worldPositionX = ping.WorldPosition.X,
                 worldPositionY = ping.WorldPosition.Y,
@@ -379,8 +384,6 @@ public sealed class ServerConnection : IDisposable
         {
             PingType = payload.pingType,
             Author = payload.author,
-            AuthorId = ulong.Parse(payload.authorId),
-            StartTimestamp = payload.startTimestamp,
             MapId = payload.mapId,
             WorldPosition = new Vector3
             {
@@ -389,6 +392,8 @@ public sealed class ServerConnection : IDisposable
                 Z = payload.worldPositionZ,
             },
         };
+        BinaryPrimitives.TryReadUInt64BigEndian(payload.authorId, out ping.AuthorId);
+        BinaryPrimitives.TryReadInt64BigEndian(payload.startTimestamp, out ping.StartTimestamp);
         this.groundPingPresenter.Value.GroundPings.AddLast(ping);
     }
 
