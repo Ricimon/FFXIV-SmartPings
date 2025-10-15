@@ -26,11 +26,11 @@ This plugin adds networked ground and UI pings to FFXIV as a Dalamud plugin.
 ```
 https://raw.githubusercontent.com/Ricimon/FFXIV-ProximityVoiceChat/refs/heads/master/repo.json
 ```
-*Both ProximityVoiceChat and SmartPings are accessible from the ProximityVoiceChat repo json*
+*All my plugins, including SmartPings, are accessible from the ProximityVoiceChat repo json*
 - Click the **+** button to the right of the text field and make sure the **Enabled checkmark** is checked.
 - Click on the **Save Button** on the bottom-right of the window.
 
-This adds plugins from this repo as installable plugins in the available plugins list. To then install the plugin itself,
+This adds plugins from this custom repo as installable plugins in the available plugins list. To then install the plugin itself,
 
 - Enter `/xlplugins` in the chat window and go to the **All Plugins** tab in the opened window.
 - Search for the **SmartPings** plugin and click **install**.
