@@ -15,7 +15,7 @@ This plugin adds networked ground and UI pings to FFXIV as a Dalamud plugin.
 ### UI Pings
 ![](images/ui_pings.gif)
 
-## Support discord
+## Support Discord
 
 [![Discord Banner](https://discord.com/api/guilds/669688899248979968/widget.png?style=banner2)](https://discord.gg/rSucAJ6A7u)
 
@@ -60,7 +60,7 @@ Currently supported UI pings:
 - Sound effects for default sound pack
 
 ## Contributing
-Please use the support discord for idea and code contribution discussion.
+Please use the support Discord for idea and code contribution discussion.
 
 This plugin's servers are self-hosted and the development team is one person, so any donations are well appreciated.
 
