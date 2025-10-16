@@ -273,16 +273,6 @@ io.on("connection", (socket) => {
     const disconnectingPeer = Object.values(connections).find((peer) => peer.socketId === socket.id);
     if (disconnectingPeer) {
       logger.info(`(${socket.id}) Disconnected peerId ${disconnectingPeer.peerId} from room ${socket.room}`);
-      // TODO: REPLACE Action.Close WITH Action.UpdatePlayersInRoom
-      // Make all peers close their peer channels
-      socket.to(socket.room).emit("message", {
-        from: disconnectingPeer.peerId,
-        target: "all",
-        payload: {
-          action: Action.Close,
-          message: "Peer has left the signaling server"
-        },
-      });
       // remove disconnecting peer from connections
       delete connections[disconnectingPeer.peerId];
       // remove disconnecting peer from instance
@@ -292,6 +282,16 @@ io.on("connection", (socket) => {
       // remove instance if empty
       if (isEmpty(instance)) {
         delete room[disconnectingPeer.instanceNumber];
+      } else {
+        // Update remaining peers of player list
+        socket.to(socket.room).emit("message", {
+          from: disconnectingPeer.peerId,
+          target: "all",
+          payload: {
+            action: Action.UpdatePlayersInRoom,
+            players: Object.keys(instance),
+          },
+        });
       }
       // remove room if empty
       if (isEmpty(room)) {
