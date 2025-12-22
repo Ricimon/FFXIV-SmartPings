@@ -93,7 +93,6 @@ public sealed class MainWindow : Window, IPluginUIView, IDisposable
 
     private string? createPrivateRoomButtonText;
 
-    private string[]? inputDevices;
     private string[]? outputDevices;
 
     public MainWindow(
@@ -261,7 +260,7 @@ public sealed class MainWindow : Window, IPluginUIView, IDisposable
         {
             if (this.createPrivateRoomButtonText == null || !this.serverConnection.InRoom)
             {
-                var playerName = this.dalamud.ClientState.GetLocalPlayerFullName();
+                var playerName = this.dalamud.PlayerState.GetLocalPlayerFullName();
                 this.createPrivateRoomButtonText = roomName.Length == 0 || roomName == playerName ?
                     "Create Private Room" : "Join Private Room";
             }

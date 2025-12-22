@@ -242,7 +242,7 @@ public sealed class ServerConnection : IDisposable
         return this.dalamud.ObjectTable.GetPlayers()
             .Select(p => p.GetPlayerFullName())
             .Where(s => s != null)
-            .Where(s => s != this.dalamud.ClientState.GetLocalPlayerFullName())
+            .Where(s => s != this.dalamud.PlayerState.GetLocalPlayerFullName())
             .Cast<string>();
     }
 
@@ -256,7 +256,7 @@ public sealed class ServerConnection : IDisposable
 
         this.logger.Debug("Attemping to join room.");
 
-        var playerName = this.dalamud.ClientState.GetLocalPlayerFullName();
+        var playerName = this.dalamud.PlayerState.GetLocalPlayerFullName();
         if (playerName == null)
         {
 #if DEBUG

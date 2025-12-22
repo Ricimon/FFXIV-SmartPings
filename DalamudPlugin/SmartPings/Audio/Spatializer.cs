@@ -73,9 +73,9 @@ public sealed class Spatializer(
         out float volume)
     {
         Vector3 toTarget;
-        if (dalamud.ClientState.LocalPlayer != null)
+        if (dalamud.ObjectTable.LocalPlayer != null)
         {
-            toTarget = position - dalamud.ClientState.LocalPlayer.Position;
+            toTarget = position - dalamud.ObjectTable.LocalPlayer.Position;
         }
         else
         {

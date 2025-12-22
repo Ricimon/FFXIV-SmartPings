@@ -121,7 +121,7 @@ public class MainWindowPresenter(
             {
                 if (string.IsNullOrEmpty(view.RoomName.Value))
                 {
-                    var playerName = dalamud.ClientState.GetLocalPlayerFullName();
+                    var playerName = dalamud.PlayerState.GetLocalPlayerFullName();
                     if (playerName == null)
                     {
                         logger.Error("Player name is null, cannot autofill private room name.");

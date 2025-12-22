@@ -2,7 +2,6 @@
 using System.Text;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
-using Lumina.Excel.Sheets;
 using SmartPings.Extensions;
 using SmartPings.Log;
 
@@ -13,7 +12,7 @@ public sealed class MapManager : IDisposable
     public ushort CurrentTerritoryId => this.dalamud.ClientState.TerritoryType;
     public uint CurrentMapId => this.dalamud.ClientState.MapId;
 
-    public event System.Action? OnMapChanged;
+    public event Action? OnMapChanged;
 
     private readonly DalamudServices dalamud;
     private readonly ILogger logger;
@@ -81,9 +80,6 @@ public sealed class MapManager : IDisposable
             default:
                 return false;
         }
-
-        //var currentCfc = this.dataManager.GetExcelSheet<ContentFinderCondition>().GetRow(GameMain.Instance()->CurrentContentFinderConditionId);
-        //return currentCfc.RowId is 0;
     }
 
     public unsafe string GetCurrentMapPublicRoomName()
@@ -92,9 +88,9 @@ public sealed class MapManager : IDisposable
         if (InSharedWorldMap())
         {
             s.Append('_');
-            if (this.dalamud.ClientState.LocalPlayer != null)
+            if (this.dalamud.PlayerState.IsLoaded)
             {
-                s.Append(this.dalamud.ClientState.LocalPlayer.CurrentWorld.Value.Name.ToString());
+                s.Append(this.dalamud.PlayerState.CurrentWorld.Value.Name.ToString());
             }
             else
             {
@@ -135,8 +131,6 @@ public sealed class MapManager : IDisposable
                     {
                         s.Append("_d"); s.Append(division);
                     }
-                    //s.Append("_r"); s.Append(housingManager->GetCurrentRoom());
-                    //s.Append("_p"); s.Append(housingManager->GetCurrentPlot());
                 }
             }
         }

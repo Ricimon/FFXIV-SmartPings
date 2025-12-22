@@ -164,7 +164,7 @@ public class GroundPingView : IPluginUIView
             ImGui.SetNextFrameWantCaptureMouse(true);
         }
 
-        if (this.dalamud.ClientState.LocalPlayer != null)
+        if (this.dalamud.PlayerState.IsLoaded)
         {
             if (!DrawPings())
             {
@@ -216,8 +216,8 @@ public class GroundPingView : IPluginUIView
                         {
                             PingType = pingType,
                             StartTimestamp = DateTime.UtcNow.Ticks,
-                            Author = this.dalamud.ClientState.LocalPlayer.Name.TextValue,
-                            AuthorId = this.dalamud.ClientState.LocalPlayer.GetPlayerContentId(),
+                            Author = this.dalamud.PlayerState.CharacterName,
+                            AuthorId = this.dalamud.PlayerState.ContentId,
                             MapId = this.mapManager.GetCurrentMapPublicRoomName(),
                             WorldPosition = worldPos,
                         };
