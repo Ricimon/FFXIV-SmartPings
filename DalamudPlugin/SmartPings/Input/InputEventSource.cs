@@ -98,8 +98,6 @@ public sealed class InputEventSource(Configuration configuration) : IDisposable
 
     private void OnKeyboardKeyDown(object? o, EventSourceEventArgs<KeyDown> e)
     {
-        if (this.configuration.KeybindsRequireGameFocus && !IsGameFocused()) { return; }
-
         foreach (var action in subscribedKeyDownActions)
         {
             action.Invoke(e.Data);
@@ -117,8 +115,6 @@ public sealed class InputEventSource(Configuration configuration) : IDisposable
 
     private void OnMouseButtonDown(object? o, EventSourceEventArgs<ButtonDown> e)
     {
-        if (this.configuration.KeybindsRequireGameFocus && !IsGameFocused()) { return; }
-
         KeyCode keyCode;
         switch(e.Data.Button)
         {

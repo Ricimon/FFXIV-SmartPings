@@ -100,8 +100,6 @@ public class MainWindowPresenter(
 
         Bind(view.PlayRoomJoinAndLeaveSounds,
             b => { configuration.PlayRoomJoinAndLeaveSounds = b; configuration.Save(); }, configuration.PlayRoomJoinAndLeaveSounds);
-        Bind(view.KeybindsRequireGameFocus,
-            b => { configuration.KeybindsRequireGameFocus = b; configuration.Save(); }, configuration.KeybindsRequireGameFocus);
         Bind(view.PrintLogsToChat,
             b => { configuration.PrintLogsToChat = b; configuration.Save(); }, configuration.PrintLogsToChat);
         Bind(view.MinimumVisibleLogLevel,

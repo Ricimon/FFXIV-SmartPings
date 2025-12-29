@@ -34,6 +34,9 @@ namespace SmartPings
         public bool SendGuiPingsToXivChat { get; set; }
         public XivChatSendLocation XivChatSendLocation { get; set; } = XivChatSendLocation.Active;
 
+        public bool OnlyEnableInCombat { get; set; } = false;
+        public bool PingKeybindBlocksGameInput { get; set; } = false;
+
         public float UiScale { get; set; } = 1.0f;
 
         public float MasterVolume { get; set; } = 1.0f;
@@ -43,7 +46,6 @@ namespace SmartPings
         public float SpatializationMinimumDistance { get; set; } = 5.0f;
 
         public bool PlayRoomJoinAndLeaveSounds { get; set; } = true;
-        public bool KeybindsRequireGameFocus { get; set; }
         public bool PrintLogsToChat { get; set; }
 
         public int MinimumVisibleLogLevel { get; set; } = LogLevel.Info.Ordinal;

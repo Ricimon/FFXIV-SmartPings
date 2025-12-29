@@ -2,6 +2,7 @@
 using System.Numerics;
 using System.Reactive.Subjects;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.UI;
@@ -53,7 +54,6 @@ public class GroundPingView : IPluginUIView
     private const float PING_WHEEL_SIZE = 310;
     private const float PING_WHEEL_CENTER_SIZE_MULTIPLIER = 0.141f;
 
-    private bool IsAnyPingEnabled => this.configuration.EnableGroundPings || this.configuration.EnableGuiPings;
     private bool IsQuickPingKeybindDown => this.keyStateWrapper.IsVirtualKeyValid(this.configuration.QuickPingKeybind) &&
         this.keyStateWrapper.GetRawValue(this.configuration.QuickPingKeybind) > 0;
     private bool CreatePingOnLeftMouseUp => pingLeftClickPosition.HasValue;
@@ -97,9 +97,13 @@ public class GroundPingView : IPluginUIView
             unsafe
             {
                 var vanillaTextInputActive = RaptureAtkModule.Instance()->AtkModule.IsTextInputActive();
-                if (key == this.configuration.PingKeybind && this.IsAnyPingEnabled && !vanillaTextInputActive)
+                if (key == this.configuration.PingKeybind && this.IsAnyPingEnabled() && !vanillaTextInputActive)
                 {
                     cursorIsPing = true;
+                    if (this.configuration.PingKeybindBlocksGameInput)
+                    {
+                        this.dalamud.KeyState[key] = false;
+                    }
                 }
                 else if (key == Dalamud.Game.ClientState.Keys.VirtualKey.ESCAPE)
                 {
@@ -110,7 +114,7 @@ public class GroundPingView : IPluginUIView
 
         this.inputEventSource.SubscribeToKeyDown(args =>
         {
-            if (this.IsAnyPingEnabled &&
+            if (this.IsAnyPingEnabled() &&
                 args.Key == WindowsInput.Events.KeyCode.LButton && (IsQuickPingKeybindDown || cursorIsPing))
             {
                 if (ImGui.IsWindowHovered(ImGuiHoveredFlags.AnyWindow))
@@ -243,7 +247,7 @@ public class GroundPingView : IPluginUIView
                 AtkStage.Instance()->AtkCursor.Hide();
                 DrawPingCursor(ImGui.GetForegroundDrawList(), ImGui.GetMousePos(), 50 * configuration.UiScale * Vector2.One);
             }
-            else if (this.IsAnyPingEnabled && IsQuickPingKeybindDown)
+            else if (this.IsAnyPingEnabled() && IsQuickPingKeybindDown)
             {
                 var position = ImGui.GetMousePos() + configuration.UiScale * new Vector2(14, 30);
                 DrawPingCursor(ImGui.GetForegroundDrawList(), position, 25 * configuration.UiScale * Vector2.One);
@@ -251,6 +255,15 @@ public class GroundPingView : IPluginUIView
         }
 
         leftMouseUpThisFrame = false;
+    }
+
+    private bool IsAnyPingEnabled()
+    {
+        if (this.configuration.OnlyEnableInCombat && !this.dalamud.Condition.Any(ConditionFlag.InCombat))
+        {
+            return false;
+        }
+        return this.configuration.EnableGroundPings || this.configuration.EnableGuiPings;
     }
 
     private unsafe bool DrawPings()

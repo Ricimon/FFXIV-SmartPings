@@ -8,6 +8,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Keys;
+using Dalamud.Interface;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Reactive.Bindings;
@@ -72,11 +74,11 @@ public sealed class MainWindow : Window, IPluginUIView, IDisposable
     private readonly Subject<Unit> printTargetStatuses = new();
 
     public IReactiveProperty<bool> PlayRoomJoinAndLeaveSounds { get; } = new ReactiveProperty<bool>();
-    public IReactiveProperty<bool> KeybindsRequireGameFocus { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<bool> PrintLogsToChat { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<int> MinimumVisibleLogLevel { get; } = new ReactiveProperty<int>();
 
     private readonly WindowSystem windowSystem;
+    private readonly AdvancedConfigWindow advancedConfigWindow;
     private readonly DalamudServices dalamud;
     private readonly ServerConnection serverConnection;
     private readonly MapManager mapChangeHandler;
@@ -97,6 +99,7 @@ public sealed class MainWindow : Window, IPluginUIView, IDisposable
 
     public MainWindow(
         WindowSystem windowSystem,
+        AdvancedConfigWindow advancedConfigWindow,
         DalamudServices dalamud,
         ServerConnection serverConnection,
         MapManager mapChangeHandler,
@@ -106,6 +109,7 @@ public sealed class MainWindow : Window, IPluginUIView, IDisposable
         PluginInitializer.Name)
     {
         this.windowSystem = windowSystem;
+        this.advancedConfigWindow = advancedConfigWindow;
         this.dalamud = dalamud;
         this.serverConnection = serverConnection;
         this.mapChangeHandler = mapChangeHandler;
@@ -141,6 +145,7 @@ public sealed class MainWindow : Window, IPluginUIView, IDisposable
     {
         if (!Visible)
         {
+            this.advancedConfigWindow.Visible = false;
             this.createPrivateRoomButtonText = null;
             return;
         }
@@ -441,6 +446,21 @@ public sealed class MainWindow : Window, IPluginUIView, IDisposable
 
         ImGui.Text("Keybinds");
         ImGui.SameLine(); Common.HelpMarker("Right click to clear a keybind.");
+
+        using (var iconFont = ImRaii.PushFont(UiBuilder.IconFont))
+        {
+            var cogIcon = FontAwesomeIcon.Cog.ToIconString();
+            ImGui.SameLine(ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X - ImGuiHelpers.GetButtonSize(cogIcon).X);
+            if (ImGui.Button(cogIcon))
+            {
+                this.advancedConfigWindow.Visible = true;
+            }
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Advanced");
+        }
+
         using (ImRaii.PushIndent())
         {
             DrawKeybindEdit(Keybind.Ping, this.configuration.PingKeybind, "Ping Keybind",
@@ -465,7 +485,6 @@ public sealed class MainWindow : Window, IPluginUIView, IDisposable
             {
                 this.EnablePingWheel.Value = enablePingWheel;
             }
-            ImGui.SameLine(); Common.HelpMarker("More ping types coming soon™");
 
             using (ImRaii.ItemWidth(100))
             {

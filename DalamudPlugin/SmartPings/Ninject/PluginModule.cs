@@ -41,6 +41,7 @@ public class PluginModule : NinjectModule
         Bind<IPluginUIPresenter, GroundPingPresenter>().To<GroundPingPresenter>().InSingletonScope();
         Bind<IPluginUIView, MainWindow>().To<MainWindow>().InSingletonScope();
         Bind<IPluginUIPresenter, MainWindowPresenter>().To<MainWindowPresenter>().InSingletonScope();
+        Bind<IPluginUIPresenter, IPluginUIView, AdvancedConfigWindow>().To<AdvancedConfigWindow>().InSingletonScope();
 
         // Data
         Bind<Configuration>().ToMethod(GetConfiguration).InSingletonScope();
