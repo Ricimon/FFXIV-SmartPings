@@ -7,7 +7,7 @@ using WindowsInput.Events.Sources;
 
 namespace SmartPings.Input;
 
-public sealed class InputEventSource(Configuration configuration) : IDisposable
+public sealed class InputEventSource : IDisposable
 {
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
@@ -31,7 +31,6 @@ public sealed class InputEventSource(Configuration configuration) : IDisposable
         }
     }
 
-    private readonly Configuration configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
     private readonly List<Action<KeyDown>> subscribedKeyDownActions = [];
     private readonly List<Action<KeyUp>> subscribedKeyUpActions = [];
 

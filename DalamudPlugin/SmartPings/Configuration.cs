@@ -41,7 +41,7 @@ namespace SmartPings
 
         public float MasterVolume { get; set; } = 1.0f;
         public int MaxConcurrentSfx { get; set; } = 5;
-        public PingSounds.Pack ActiveSoundPack { get; set; } = PingSounds.Pack.Default;
+        public PingSounds.Pack ActiveSoundPack { get; set; } = PingSounds.Pack.LeagueOfLegends;
         public bool EnableSpatialization { get; set; } = true;
         public float SpatializationMinimumDistance { get; set; } = 5.0f;
 

@@ -4,6 +4,7 @@ using System.Reactive.Subjects;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Interface.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
@@ -129,7 +130,7 @@ public class GroundPingView : IPluginUIView
 
                 if (!this.configuration.EnableGroundPings) { return; }
 
-                ImGuiExtensions.CaptureMouseThisFrame();
+                Extensions.ImGuiExtensions.CaptureMouseThisFrame();
                 cursorIsPing = false;
                 pingLeftClickPosition = ImGui.GetMousePos();
                 pingLeftClickHeldDuration = 0;
@@ -163,6 +164,15 @@ public class GroundPingView : IPluginUIView
     {
         if (this.presenter.Value == null) { return; }
 
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
+        ImGuiHelpers.ForceNextWindowMainViewport();
+        ImGuiHelpers.SetNextWindowPosRelativeMainViewport(Vector2.Zero);
+        ImGui.Begin("###SmartPingsOverlay",
+            ImGuiWindowFlags.NoInputs | ImGuiWindowFlags.NoNav | ImGuiWindowFlags.NoTitleBar |
+            ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoBackground | ImGuiWindowFlags.NoFocusOnAppearing |
+            ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoMove);
+        ImGui.SetWindowSize(ImGui.GetIO().DisplaySize);
+
         if (CreatePingOnLeftMouseUp)
         {
             ImGui.SetNextFrameWantCaptureMouse(true);
@@ -192,7 +202,7 @@ public class GroundPingView : IPluginUIView
 
                     if (pingWheelActive)
                     {
-                        activePingWheelSection = DrawPingWheel(ImGui.GetForegroundDrawList(), pingLeftClickPosition!.Value, ImGui.GetMousePos());
+                        activePingWheelSection = DrawPingWheel(ImGui.GetWindowDrawList(), pingLeftClickPosition!.Value, ImGui.GetMousePos());
                     }
                 }
                 else
@@ -245,15 +255,17 @@ public class GroundPingView : IPluginUIView
             {
                 ImGui.SetMouseCursor(ImGuiMouseCursor.None);
                 AtkStage.Instance()->AtkCursor.Hide();
-                DrawPingCursor(ImGui.GetForegroundDrawList(), ImGui.GetMousePos(), 50 * configuration.UiScale * Vector2.One);
+                DrawPingCursor(ImGui.GetWindowDrawList(), ImGui.GetMousePos(), 50 * configuration.UiScale * Vector2.One);
             }
             else if (this.IsAnyPingEnabled() && IsQuickPingKeybindDown)
             {
                 var position = ImGui.GetMousePos() + configuration.UiScale * new Vector2(14, 30);
-                DrawPingCursor(ImGui.GetForegroundDrawList(), position, 25 * configuration.UiScale * Vector2.One);
+                DrawPingCursor(ImGui.GetWindowDrawList(), position, 25 * configuration.UiScale * Vector2.One);
             }
         }
 
+        ImGui.End();
+        ImGui.PopStyleVar();
         leftMouseUpThisFrame = false;
     }
 
@@ -307,16 +319,16 @@ public class GroundPingView : IPluginUIView
             switch (p.PingType)
             {
                 case GroundPing.Type.Basic:
-                    pingDrawn = DrawBasicPing(ImGui.GetForegroundDrawList(), p.WorldPosition, p.DrawDuration, p.Author);
+                    pingDrawn = DrawBasicPing(ImGui.GetWindowDrawList(), p.WorldPosition, p.DrawDuration, p.Author);
                     break;
                 case GroundPing.Type.Question:
-                    pingDrawn = DrawQuestionMarkPing(ImGui.GetForegroundDrawList(), p.WorldPosition, p.DrawDuration, p.Author);
+                    pingDrawn = DrawQuestionMarkPing(ImGui.GetWindowDrawList(), p.WorldPosition, p.DrawDuration, p.Author);
                     break;
                 case GroundPing.Type.Danger:
-                    pingDrawn = DrawDangerPing(ImGui.GetForegroundDrawList(), p.WorldPosition, p.DrawDuration, p.Author);
+                    pingDrawn = DrawDangerPing(ImGui.GetWindowDrawList(), p.WorldPosition, p.DrawDuration, p.Author);
                     break;
                 case GroundPing.Type.Assist:
-                    pingDrawn = DrawAssistPing(ImGui.GetForegroundDrawList(), p.WorldPosition, p.DrawDuration, p.Author);
+                    pingDrawn = DrawAssistPing(ImGui.GetWindowDrawList(), p.WorldPosition, p.DrawDuration, p.Author);
                     break;
                 case GroundPing.Type.OnMyWay:
                     IPlayerCharacter? author = null;
@@ -324,7 +336,7 @@ public class GroundPingView : IPluginUIView
                     {
                         author = this.dalamud.ObjectTable.GetPlayers().AsValueEnumerable().FirstOrDefault(pl => pl.GetPlayerContentId() == p.AuthorId);
                     }
-                    pingDrawn = DrawOnMyWayPing(ImGui.GetForegroundDrawList(), p.WorldPosition, p.DrawDuration, p.Author, author?.Position);
+                    pingDrawn = DrawOnMyWayPing(ImGui.GetWindowDrawList(), p.WorldPosition, p.DrawDuration, p.Author, author?.Position);
                     break;
             }
 
