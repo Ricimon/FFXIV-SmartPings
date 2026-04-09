@@ -5,6 +5,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
@@ -164,109 +165,117 @@ public class GroundPingView : IPluginUIView
     {
         if (this.presenter.Value == null) { return; }
 
-        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
+        using var style = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, Vector2.Zero);
         ImGuiHelpers.ForceNextWindowMainViewport();
         ImGuiHelpers.SetNextWindowPosRelativeMainViewport(Vector2.Zero);
-        ImGui.Begin("###SmartPingsOverlay",
+        if (!ImGui.Begin("###SmartPingsOverlay",
             ImGuiWindowFlags.NoInputs | ImGuiWindowFlags.NoNav | ImGuiWindowFlags.NoTitleBar |
             ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoBackground | ImGuiWindowFlags.NoFocusOnAppearing |
-            ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoMove);
+            ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoMove))
+        {
+            this.logger.Error("Could not create SmartPings overlay window");
+            return;
+        }
         ImGui.SetWindowSize(ImGui.GetIO().DisplaySize);
 
-        if (CreatePingOnLeftMouseUp)
+        try
         {
-            ImGui.SetNextFrameWantCaptureMouse(true);
-        }
+            if (CreatePingOnLeftMouseUp)
+            {
+                ImGui.SetNextFrameWantCaptureMouse(true);
+            }
 
-        if (this.dalamud.PlayerState.IsLoaded)
-        {
-            if (!DrawPings())
+            if (this.dalamud.PlayerState.IsLoaded)
+            {
+                if (!DrawPings())
+                {
+                    this.presenter.Value.GroundPings.Clear();
+                }
+
+                if (CreatePingOnLeftMouseUp)
+                {
+                    if (!leftMouseUpThisFrame)
+                    {
+                        if (!pingWheelActive && this.configuration.EnablePingWheel)
+                        {
+                            pingLeftClickHeldDuration += ImGui.GetIO().DeltaTime;
+                            var moveDistance = Vector2.Distance(ImGui.GetMousePos(), pingLeftClickPosition!.Value);
+                            if (pingLeftClickHeldDuration > LEFT_CLICK_HOLD_DURATION_FOR_PING_WHEEL ||
+                                moveDistance > PING_WHEEL_CENTER_SIZE_MULTIPLIER * PING_WHEEL_SIZE)
+                            {
+                                pingWheelActive = true;
+                            }
+                        }
+
+                        if (pingWheelActive)
+                        {
+                            activePingWheelSection = DrawPingWheel(ImGui.GetWindowDrawList(), pingLeftClickPosition!.Value, ImGui.GetMousePos());
+                        }
+                    }
+                    else
+                    {
+                        var pingType = this.configuration.DefaultGroundPingType;
+                        if (pingWheelActive)
+                        {
+                            switch (activePingWheelSection)
+                            {
+                                case PingWheelSection.Center: pingType = GroundPing.Type.None; break;
+                                case PingWheelSection.Left: pingType = GroundPing.Type.Question; break;
+                                case PingWheelSection.Up: pingType = GroundPing.Type.Danger; break;
+                                case PingWheelSection.Right: pingType = GroundPing.Type.OnMyWay; break;
+                                case PingWheelSection.Down: pingType = GroundPing.Type.Assist; break;
+                            }
+                        }
+
+                        // When ping wheel isn't enabled, it feels better to place the ping at the mouse position on left click release rather than press
+                        var pingPosition = this.configuration.EnablePingWheel ? pingLeftClickPosition!.Value : ImGui.GetMousePos();
+                        if (pingType != GroundPing.Type.None &&
+                            this.dalamud.GameGui.ScreenToWorld(pingPosition, out var worldPos))
+                        {
+                            this.logger.Debug("Clicked on world position {0} for ground ping", worldPos);
+                            var ping = new GroundPing
+                            {
+                                PingType = pingType,
+                                StartTimestamp = DateTime.UtcNow.Ticks,
+                                Author = this.dalamud.PlayerState.CharacterName,
+                                AuthorId = this.dalamud.PlayerState.ContentId,
+                                MapId = this.mapManager.GetCurrentMapPublicRoomName(),
+                                WorldPosition = worldPos,
+                            };
+                            this.addGroundPing.OnNext(ping);
+                        }
+
+                        pingLeftClickPosition = null;
+                        pingLeftClickHeldDuration = 0;
+                        pingWheelActive = false;
+                    }
+                }
+            }
+            else
             {
                 this.presenter.Value.GroundPings.Clear();
             }
 
-            if (CreatePingOnLeftMouseUp)
+            unsafe
             {
-                if (!leftMouseUpThisFrame)
+                if (cursorIsPing)
                 {
-                    if (!pingWheelActive && this.configuration.EnablePingWheel)
-                    {
-                        pingLeftClickHeldDuration += ImGui.GetIO().DeltaTime;
-                        var moveDistance = Vector2.Distance(ImGui.GetMousePos(), pingLeftClickPosition!.Value);
-                        if (pingLeftClickHeldDuration > LEFT_CLICK_HOLD_DURATION_FOR_PING_WHEEL ||
-                            moveDistance > PING_WHEEL_CENTER_SIZE_MULTIPLIER * PING_WHEEL_SIZE)
-                        {
-                            pingWheelActive = true;
-                        }
-                    }
-
-                    if (pingWheelActive)
-                    {
-                        activePingWheelSection = DrawPingWheel(ImGui.GetWindowDrawList(), pingLeftClickPosition!.Value, ImGui.GetMousePos());
-                    }
+                    ImGui.SetMouseCursor(ImGuiMouseCursor.None);
+                    AtkStage.Instance()->AtkCursor.Hide();
+                    DrawPingCursor(ImGui.GetWindowDrawList(), ImGui.GetMousePos(), 50 * configuration.UiScale * Vector2.One);
                 }
-                else
+                else if (this.IsAnyPingEnabled() && IsQuickPingKeybindDown)
                 {
-                    var pingType = this.configuration.DefaultGroundPingType;
-                    if (pingWheelActive)
-                    {
-                        switch (activePingWheelSection)
-                        {
-                            case PingWheelSection.Center: pingType = GroundPing.Type.None; break;
-                            case PingWheelSection.Left: pingType = GroundPing.Type.Question; break;
-                            case PingWheelSection.Up: pingType = GroundPing.Type.Danger; break;
-                            case PingWheelSection.Right: pingType = GroundPing.Type.OnMyWay; break;
-                            case PingWheelSection.Down: pingType = GroundPing.Type.Assist; break;
-                        }
-                    }
-
-                    // When ping wheel isn't enabled, it feels better to place the ping at the mouse position on left click release rather than press
-                    var pingPosition = this.configuration.EnablePingWheel ? pingLeftClickPosition!.Value : ImGui.GetMousePos();
-                    if (pingType != GroundPing.Type.None &&
-                        this.dalamud.GameGui.ScreenToWorld(pingPosition, out var worldPos))
-                    {
-                        this.logger.Debug("Clicked on world position {0} for ground ping", worldPos);
-                        var ping = new GroundPing
-                        {
-                            PingType = pingType,
-                            StartTimestamp = DateTime.UtcNow.Ticks,
-                            Author = this.dalamud.PlayerState.CharacterName,
-                            AuthorId = this.dalamud.PlayerState.ContentId,
-                            MapId = this.mapManager.GetCurrentMapPublicRoomName(),
-                            WorldPosition = worldPos,
-                        };
-                        this.addGroundPing.OnNext(ping);
-                    }
-
-                    pingLeftClickPosition = null;
-                    pingLeftClickHeldDuration = 0;
-                    pingWheelActive = false;
+                    var position = ImGui.GetMousePos() + configuration.UiScale * new Vector2(14, 30);
+                    DrawPingCursor(ImGui.GetWindowDrawList(), position, 25 * configuration.UiScale * Vector2.One);
                 }
             }
         }
-        else
+        finally
         {
-            this.presenter.Value.GroundPings.Clear();
+            ImGui.End();
+            leftMouseUpThisFrame = false;
         }
-
-        unsafe
-        {
-            if (cursorIsPing)
-            {
-                ImGui.SetMouseCursor(ImGuiMouseCursor.None);
-                AtkStage.Instance()->AtkCursor.Hide();
-                DrawPingCursor(ImGui.GetWindowDrawList(), ImGui.GetMousePos(), 50 * configuration.UiScale * Vector2.One);
-            }
-            else if (this.IsAnyPingEnabled() && IsQuickPingKeybindDown)
-            {
-                var position = ImGui.GetMousePos() + configuration.UiScale * new Vector2(14, 30);
-                DrawPingCursor(ImGui.GetWindowDrawList(), position, 25 * configuration.UiScale * Vector2.One);
-            }
-        }
-
-        ImGui.End();
-        ImGui.PopStyleVar();
-        leftMouseUpThisFrame = false;
     }
 
     private bool IsAnyPingEnabled()
