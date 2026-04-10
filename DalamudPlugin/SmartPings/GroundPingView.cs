@@ -138,7 +138,9 @@ public class GroundPingView : IPluginUIView
                 pingWheelActive = false;
             }
 
-            else if (args.Key == WindowsInput.Events.KeyCode.RButton)
+
+
+            if (args.Key == WindowsInput.Events.KeyCode.RButton)
             {
                 cursorIsPing = false;
                 // Cancel ping wheel
@@ -158,12 +160,11 @@ public class GroundPingView : IPluginUIView
                 cursorIsPing = false;
                 leftMouseUpThisFrame = true;
             }
-        });
 
-        this.keyStateWrapper.OnKeyUp += key =>
-        {
-            // this.logger.Debug(this.configuration.QuickerPingKeybind + " " + key.ToString());
-            if (key == this.configuration.QuickerPingKeybind && IsAnyPingEnabled)
+
+            // Quicker ping on key release
+            else if (this.IsAnyPingEnabled() &&
+                args.Key == (WindowsInput.Events.KeyCode)this.configuration.QuickerPingKeybind)
             {
                 if (ImGui.IsWindowHovered(ImGuiHoveredFlags.AnyWindow))
                 {
@@ -177,14 +178,27 @@ public class GroundPingView : IPluginUIView
 
                 if (!this.configuration.EnableGroundPings) { return; }
 
-                ImGuiExtensions.CaptureMouseThisFrame();
-                pingLeftClickPosition = ImGui.GetMousePos();
-                pingLeftClickHeldDuration = 0;
-                pingWheelActive = false;
-
-                cursorIsPing = false;
-                leftMouseUpThisFrame = true;
+                // Quicker ping on configured key release - create ping at current mouse position
+                var mousePosition = ImGui.GetMousePos();
+                if (this.dalamud.GameGui.ScreenToWorld(mousePosition, out var worldPos))
+                {
+                    var ping = new GroundPing
+                    {
+                        PingType = this.configuration.DefaultGroundPingType,
+                        StartTimestamp = DateTime.UtcNow.Ticks,
+                        Author = this.dalamud.PlayerState.CharacterName,
+                        AuthorId = this.dalamud.PlayerState.ContentId,
+                        MapId = this.mapManager.GetCurrentMapPublicRoomName(),
+                        WorldPosition = worldPos,
+                    };
+                    this.addGroundPing.OnNext(ping);
+                }
             }
+        });
+
+        this.keyStateWrapper.OnKeyUp += key =>
+        {
+            // Quicker ping is handled in InputEventSource key up for anti-spam behavior
         };
     }
 
