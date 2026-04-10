@@ -140,7 +140,7 @@ public class GroundPingView : IPluginUIView
 
 
 
-            if (args.Key == WindowsInput.Events.KeyCode.RButton)
+            else if (args.Key == WindowsInput.Events.KeyCode.RButton)
             {
                 cursorIsPing = false;
                 // Cancel ping wheel
