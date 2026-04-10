@@ -467,6 +467,8 @@ public sealed class MainWindow : Window, IPluginUIView, IDisposable
                 "Pressing this keybind will make the next left click execute a ping.");
             DrawKeybindEdit(Keybind.QuickPing, this.configuration.QuickPingKeybind, "Quick Ping Keybind",
                 "Lefting clicking while holding this keybind will execute a ping.");
+            DrawKeybindEdit(Keybind.QuickerPing, this.configuration.QuickerPingKeybind, "Quicker Ping Keybind",
+                "Clicking keybind will execute a ping.");
         }
 
         ImGui.Dummy(new Vector2(0.0f, 5.0f)); // ---------------

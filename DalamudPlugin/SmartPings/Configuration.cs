@@ -23,6 +23,7 @@ namespace SmartPings
 
         public VirtualKey PingKeybind { get; set; } = VirtualKey.G;
         public VirtualKey QuickPingKeybind { get; set; } = VirtualKey.CONTROL;
+        public VirtualKey QuickerPingKeybind { get; set; } = VirtualKey.MBUTTON;
 
         public bool EnableGroundPings { get; set; } = true;
         public bool EnablePingWheel { get; set; } = true;
