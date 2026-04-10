@@ -6,7 +6,7 @@ using SmartPings.Log;
 
 namespace SmartPings.Audio;
 
-public class AudioDeviceController : IAudioDeviceController, IDisposable
+public sealed class AudioDeviceController : IAudioDeviceController, IDisposable
 {
     public bool IsAudioPlaybackSourceActive => AudioPlaybackIsRequested;
 
@@ -71,7 +71,6 @@ public class AudioDeviceController : IAudioDeviceController, IDisposable
     {
         DisposeAudioPlaybackSource();
         this.outputSampleProvider.MixerInputEnded -= OnMixerInputEnded;
-        GC.SuppressFinalize(this);
     }
 
     public IEnumerable<string> GetAudioPlaybackDevices()

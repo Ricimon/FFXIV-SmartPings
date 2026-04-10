@@ -6,7 +6,6 @@ using System.Text;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
-using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using ECommons.Automation;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
@@ -20,47 +19,27 @@ using SmartPings.Network;
 
 namespace SmartPings;
 
-public unsafe class GuiPingHandler
+public unsafe class GuiPingHandler(
+    DalamudServices dalamud,
+    Chat chat,
+    XivHudNodeMap hudNodeMap,
+    ServerConnection serverConnection,
+    Configuration configuration,
+    ILogger logger)
 {
+    public enum UiPingType
+    {
+        Echo,
+        Chat,
+    }
+
     private const ushort BLUE = 542;
     private const ushort LIGHT_BLUE = 529;
     private const ushort YELLOW = 25;
     private const ushort GREEN = 43;
     private const ushort RED = 518;
 
-    private readonly IClientState clientState;
-    private readonly IDataManager dataManager;
-    private readonly IChatGui chatGui;
-    private readonly IFramework framework;
-    private readonly Chat chat;
-    private readonly XivHudNodeMap hudNodeMap;
-    private readonly ServerConnection serverConnection;
-    private readonly Configuration configuration;
-    private readonly ILogger logger;
-
     private readonly List<Status> statuses = [];
-
-    public GuiPingHandler(
-        IClientState clientState,
-        IDataManager dataManager,
-        IChatGui chatGui,
-        IFramework framework,
-        Chat chat,
-        XivHudNodeMap hudNodeMap,
-        ServerConnection serverConnection,
-        Configuration configuration,
-        ILogger logger)
-    {
-        this.clientState = clientState;
-        this.dataManager = dataManager;
-        this.chatGui = chatGui;
-        this.framework = framework;
-        this.chat = chat;
-        this.hudNodeMap = hudNodeMap;
-        this.serverConnection = serverConnection;
-        this.configuration = configuration;
-        this.logger = logger;
-    }
 
     public static BattleChara* GetLocalPlayer()
     {
@@ -95,6 +74,137 @@ public unsafe class GuiPingHandler
         return default;
     }
 
+    public static Tuple<SeStringBuilder?, StringBuilder?> CreateUiPingString(UiPingType pingType, string? sourceName, HudElementInfo info)
+    {
+        SeStringBuilder? echoMsg = null;
+        StringBuilder? chatMsg = null;
+        if (pingType == UiPingType.Echo)
+        {
+            echoMsg = new();
+        }
+        else if (pingType == UiPingType.Chat)
+        {
+            chatMsg = new();
+        }
+        else
+        {
+            return new(null, null);
+        }
+
+        // Source name -------------
+        if (!string.IsNullOrEmpty(sourceName))
+        {
+            echoMsg?.AddUiForeground($"({sourceName}) ", BLUE);
+        }
+        else
+        {
+            return new(null, null);
+        }
+
+        // Target name -------------
+        if (!info.IsOnSelf)
+        {
+            echoMsg?.AddUiForeground($"{info.OwnerName}: ", info.IsOnHostile ? RED : LIGHT_BLUE);
+
+            chatMsg?.Append($"{info.OwnerName}: ");
+        }
+
+        if (info.ElementType == HudElementInfo.Type.Status)
+        {
+            var isRealStatus = info.Status.Id > 0;
+
+            // Status name --------------
+            if (isRealStatus)
+            {
+                echoMsg?.AddStatusLink(info.Status.Id);
+                // This is how status links are normally constructed
+                echoMsg?.AddUiForeground(500);
+                echoMsg?.AddUiGlow(501);
+                echoMsg?.Append(SeIconChar.LinkMarker.ToIconString());
+                echoMsg?.AddUiGlowOff();
+                echoMsg?.AddUiForegroundOff();
+            }
+            if (info.Status.IsEnfeeblement)
+            {
+                echoMsg?.AddUiForeground(518);
+                echoMsg?.Append(SeIconChar.Debuff.ToIconString());
+                echoMsg?.AddUiForegroundOff();
+            }
+            else
+            {
+                echoMsg?.AddUiForeground(517);
+                echoMsg?.Append(SeIconChar.Buff.ToIconString());
+                echoMsg?.AddUiForegroundOff();
+            }
+            var beneficial = info.IsOnHostile == info.Status.IsEnfeeblement;
+            echoMsg?.AddUiForeground($"{info.Status.Name}", beneficial ? YELLOW : RED);
+            if (isRealStatus) { echoMsg?.Append([RawPayload.LinkTerminator]); }
+
+            chatMsg?.Append(isRealStatus ? "<status>" : info.Status.Name);
+
+            if (info.Status.MaxStacks > 0)
+            {
+                echoMsg?.AddUiForeground($" x{info.Status.Stacks}", beneficial ? YELLOW : RED);
+
+                chatMsg?.Append($" x{info.Status.Stacks}");
+            }
+
+            // Timer ---------------
+            if (info.Status.RemainingTime > 0)
+            {
+                echoMsg?.AddUiForeground(" - ", YELLOW);
+                var remainingTime = info.Status.RemainingTime >= 1 ?
+                    MathF.Floor(info.Status.RemainingTime).ToString() :
+                    info.Status.RemainingTime.ToString("F1");
+                echoMsg?.AddUiForeground($"{remainingTime}s", GREEN);
+
+                chatMsg?.Append($" - {remainingTime}s");
+            }
+        }
+        else if (info.ElementType == HudElementInfo.Type.Hp)
+        {
+            var hpPercent = (float)info.Hp.Value / info.Hp.MaxValue * 100;
+            hpPercent = MathF.Floor(hpPercent * 10) / 10;
+            var hpString = hpPercent == 100 ? hpPercent.ToString("F0") : hpPercent.ToString("F1");
+            if (hpString == "0.0" && hpPercent > 0) { hpString = "0.1"; }
+            echoMsg?.AddUiForeground($"HP: {hpString}%", hpPercent < 10 ? RED : YELLOW);
+            if (info.IsOnPartyMember || info.IsOnSelf)
+            {
+                echoMsg?.AddUiForeground($" ({info.Hp.Value:N0}/{info.Hp.MaxValue:N0})", GREEN);
+            }
+
+            chatMsg?.Append($"HP: {hpString}%");
+            if (info.IsOnPartyMember || info.IsOnSelf)
+            {
+                chatMsg?.Append($" ({info.Hp.Value:N0}/{info.Hp.MaxValue:N0})");
+            }
+        }
+        else if (info.ElementType == HudElementInfo.Type.Mp)
+        {
+            var mpPercent = (float)info.Mp.Value / info.Mp.MaxValue * 100;
+            mpPercent = MathF.Floor(mpPercent * 10) / 10;
+            var mpString = mpPercent == 100 ? mpPercent.ToString("F0") : mpPercent.ToString("F1");
+            if (mpString == "0.0" && mpPercent > 0) { mpString = "0.1"; }
+            echoMsg?.AddUiForeground($"MP: {mpString}%", mpPercent < 10 ? RED : YELLOW);
+            if (info.IsOnPartyMember || info.IsOnSelf)
+            {
+                echoMsg?.AddUiForeground($" ({info.Mp.Value:N0}/{info.Mp.MaxValue:N0})", GREEN);
+            }
+
+            chatMsg?.Append($"MP: {mpString}%");
+            if (info.IsOnPartyMember || info.IsOnSelf)
+            {
+                chatMsg?.Append($" ({info.Mp.Value:N0}/{info.Mp.MaxValue:N0})");
+            }
+        }
+        else
+        {
+            return new(null, null);
+        }
+
+        return new(echoMsg, chatMsg);
+    }
+
     public bool TryPingUi()
     {
         var collisionNode = AtkStage.Instance()->AtkCollisionManager->IntersectingCollisionNode;
@@ -104,153 +214,73 @@ public unsafe class GuiPingHandler
         // World UI such as Nameplates have this flag
         if (collisionNode != null && collisionNode->NodeFlags.HasFlag(NodeFlags.UseDepthBasedPriority)) { return false; }
 
-        this.logger.Debug("Mouse over collision node {0} and addon {1}",
+        logger.Debug("Mouse over collision node {0} and addon {1}",
             ((nint)collisionNode).ToString("X"),
             ((nint)addon).ToString("X"));
 
-        if (!this.configuration.EnableGuiPings) { return true; }
+        if (!configuration.EnableGuiPings) { return true; }
 
         if (TryGetCollisionNodeElementInfo(collisionNode, out var info))
         {
-            var echoMsg = new SeStringBuilder();
-            var chatMsg = new StringBuilder();
+            ServerMessage.Payload.UiPingPayload uiPing = new()
+            {
+                sourceName = GetLocalPlayerName(),
+                hudElementInfo = info,
+            };
 
-            // Source name -------------
+            if (info.ElementType == HudElementInfo.Type.Hp ||
+                info.ElementType == HudElementInfo.Type.Mp)
+            {
+                ImGuiExtensions.CaptureMouseThisFrame();
+            }
+
             var localPlayerName = GetLocalPlayerName();
-            echoMsg.AddUiForeground($"({localPlayerName}) ", BLUE);
 
-            // Target name -------------
-            if (!info.IsOnSelf)
+            if (configuration.SendGuiPingsToXivChat)
             {
-                echoMsg.AddUiForeground($"{info.OwnerName}: ", info.IsOnHostile ? RED : LIGHT_BLUE);
-
-                chatMsg.Append($"{info.OwnerName}: ");
-            }
-
-            if (info.ElementType == HudElementInfo.Type.Status)
-            {
-                var isRealStatus = info.Status.Id > 0;
-
-                // Status name --------------
-                if (isRealStatus)
+                var chatMsg = CreateUiPingString(UiPingType.Chat, localPlayerName, info).Item2;
+                if (chatMsg != null)
                 {
-                    echoMsg.AddStatusLink(info.Status.Id);
-                    // This is how status links are normally constructed
-                    echoMsg.AddUiForeground(500);
-                    echoMsg.AddUiGlow(501);
-                    echoMsg.Append(SeIconChar.LinkMarker.ToIconString());
-                    echoMsg.AddUiGlowOff();
-                    echoMsg.AddUiForegroundOff();
-                }
-                if (info.Status.IsEnfeeblement)
-                {
-                    echoMsg.AddUiForeground(518);
-                    echoMsg.Append(SeIconChar.Debuff.ToIconString());
-                    echoMsg.AddUiForegroundOff();
-                }
-                else
-                {
-                    echoMsg.AddUiForeground(517);
-                    echoMsg.Append(SeIconChar.Buff.ToIconString());
-                    echoMsg.AddUiForegroundOff();
-                }
-                var beneficial = info.IsOnHostile == info.Status.IsEnfeeblement;
-                echoMsg.AddUiForeground($"{info.Status.Name}", beneficial ? YELLOW : RED);
-                if (isRealStatus) { echoMsg.Append([RawPayload.LinkTerminator]); }
-
-                chatMsg.Append(isRealStatus ? "<status>" : info.Status.Name);
-
-                if (info.Status.MaxStacks > 0)
-                {
-                    echoMsg.AddUiForeground($" x{info.Status.Stacks}", beneficial ? YELLOW : RED);
-
-                    chatMsg.Append($" x{info.Status.Stacks}");
-                }
-
-                // Timer ---------------
-                if (info.Status.RemainingTime > 0)
-                {
-                    echoMsg.AddUiForeground(" - ", YELLOW);
-                    var remainingTime = info.Status.RemainingTime >= 1 ?
-                        MathF.Floor(info.Status.RemainingTime).ToString() :
-                        info.Status.RemainingTime.ToString("F1");
-                    echoMsg.AddUiForeground($"{remainingTime}s", GREEN);
-
-                    chatMsg.Append($" - {remainingTime}s");
-                }
-            }
-            else if (info.ElementType == HudElementInfo.Type.Hp)
-            {
-                var hpPercent = (float)info.Hp.Value / info.Hp.MaxValue * 100;
-                hpPercent = MathF.Floor(hpPercent * 10) / 10;
-                var hpString = hpPercent == 100 ? hpPercent.ToString("F0") : hpPercent.ToString("F1");
-                if (hpString == "0.0" && hpPercent > 0) { hpString = "0.1"; }
-                echoMsg.AddUiForeground($"HP: {hpString}%", hpPercent < 10 ? RED : YELLOW);
-                if (info.IsOnPartyMember || info.IsOnSelf)
-                {
-                    echoMsg.AddUiForeground($" ({info.Hp.Value:N0}/{info.Hp.MaxValue:N0})", GREEN);
-                }
-
-                chatMsg.Append($"HP: {hpString}%");
-                if (info.IsOnPartyMember || info.IsOnSelf)
-                {
-                    chatMsg.Append($" ({info.Hp.Value:N0}/{info.Hp.MaxValue:N0})");
-                }
-
-                ImGuiExtensions.CaptureMouseThisFrame();
-            }
-            else if (info.ElementType == HudElementInfo.Type.Mp)
-            {
-                var mpPercent = (float)info.Mp.Value / info.Mp.MaxValue * 100;
-                mpPercent = MathF.Floor(mpPercent * 10) / 10;
-                var mpString = mpPercent == 100 ? mpPercent.ToString("F0") : mpPercent.ToString("F1");
-                if (mpString == "0.0" && mpPercent > 0) { mpString = "0.1"; }
-                echoMsg.AddUiForeground($"MP: {mpString}%", mpPercent < 10 ? RED : YELLOW);
-                if (info.IsOnPartyMember || info.IsOnSelf)
-                {
-                    echoMsg.AddUiForeground($" ({info.Mp.Value:N0}/{info.Mp.MaxValue:N0})", GREEN);
-                }
-
-                chatMsg.Append($"MP: {mpString}%");
-                if (info.IsOnPartyMember || info.IsOnSelf)
-                {
-                    chatMsg.Append($" ({info.Mp.Value:N0}/{info.Mp.MaxValue:N0})");
-                }
-
-                ImGuiExtensions.CaptureMouseThisFrame();
-            }
-
-            if (this.configuration.SendGuiPingsToXivChat)
-            {
-                // This method must be called on a framework thread or else XIV will crash.
-                this.framework.Run(() =>
-                {
-                    if (info.ElementType == HudElementInfo.Type.Status)
+                    // This method must be called on a framework thread or else XIV will crash.
+                    dalamud.Framework.Run(() =>
                     {
-                        AgentChatLog.Instance()->ContextStatusId = info.Status.Id;
-                    }
-                    if (this.configuration.XivChatSendLocation == XivChatSendLocation.Party)
-                    {
-                        chatMsg.Insert(0, "/party ");
-                    }
-                    this.chat.SendMessage(chatMsg.ToString());
-                });
+                        if (info.ElementType == HudElementInfo.Type.Status)
+                        {
+                            AgentChatLog.Instance()->ContextStatusId = info.Status.Id;
+                        }
+                        if (configuration.XivChatSendLocation == XivChatSendLocation.Party)
+                        {
+                            chatMsg.Insert(0, "/party ");
+                        }
+                        chat.SendMessage(chatMsg.ToString());
+                    });
+                }
             }
 
-            if (this.configuration.SendGuiPingsToCustomServer)
+            if (configuration.SendGuiPingsToCustomServer)
             {
-                var xivMsg = new XivChatEntry
+                var echoMsg = CreateUiPingString(UiPingType.Echo, localPlayerName, info).Item1;
+                if (echoMsg != null)
                 {
-                    Type = XivChatType.Echo,
-                    Message = echoMsg.Build(),
-                };
-                this.chatGui.Print(xivMsg);
+                    EchoUiPing(echoMsg);
 
-                this.serverConnection.SendChatMessage(xivMsg);
+                    serverConnection.SendUiPing(localPlayerName, info);
+                }
             }
         }
 
         return true;
+    }
+
+    public void EchoUiPing(SeStringBuilder sb)
+    {
+        if (sb == null) { return; }
+        var xivMsg = new XivChatEntry
+        {
+            Type = XivChatType.Echo,
+            Message = sb.Build(),
+        };
+        dalamud.ChatGui.Print(xivMsg);
     }
 
     // To determine what status was clicked on, we need to go from AtkImageNode (inherits AtkCollisionNode) to Status information.
@@ -275,7 +305,7 @@ public unsafe class GuiPingHandler
         info = default;
 
         // Search for the node in our node map to determine if it's a relevant HUD element
-        if (!this.hudNodeMap.TryGetAsHudElement((nint)collisionNode, out var hudElement)) { return false; }
+        if (!hudNodeMap.TryGetAsHudElement((nint)collisionNode, out var hudElement)) { return false; }
 
         switch (hudElement.HudSection)
         {
@@ -382,7 +412,7 @@ public unsafe class GuiPingHandler
             case XivHudNodeMap.HudSection.PartyList8CollisionNode:
             case XivHudNodeMap.HudSection.PartyList9CollisionNode:
                 {
-                    if (!this.configuration.EnableHpMpPings) { break; }
+                    if (!configuration.EnableHpMpPings) { break; }
 
                     var partyMemberIndex = hudElement.HudSection - XivHudNodeMap.HudSection.PartyList1CollisionNode;
                     if (partyMemberIndex < AgentHUD.Instance()->PartyMemberCount)
@@ -392,7 +422,7 @@ public unsafe class GuiPingHandler
                         var mousePosition = new Vector2(UIInputData.Instance()->CursorInputs.PositionX, UIInputData.Instance()->CursorInputs.PositionY);
                         // Check for HP node
                         var element = new XivHudNodeMap.HudElement(XivHudNodeMap.HudSection.PartyList1Hp + partyMemberIndex);
-                        if (this.hudNodeMap.TryGetHudElementNode(element, out var hpNode) &&
+                        if (hudNodeMap.TryGetHudElementNode(element, out var hpNode) &&
                             IsPositionInNode(mousePosition, (AtkResNode*)hpNode))
                         {
                             info.ElementType = HudElementInfo.Type.Hp;
@@ -405,7 +435,7 @@ public unsafe class GuiPingHandler
                         }
                         // Check for MP node
                         element = new XivHudNodeMap.HudElement(XivHudNodeMap.HudSection.PartyList1Mp + partyMemberIndex);
-                        if (this.hudNodeMap.TryGetHudElementNode(element, out var mpNode) &&
+                        if (hudNodeMap.TryGetHudElementNode(element, out var mpNode) &&
                             IsPositionInNode(mousePosition, (AtkResNode*)mpNode))
                         {
                             info.ElementType = HudElementInfo.Type.Mp;
@@ -470,20 +500,20 @@ public unsafe class GuiPingHandler
 
         // Early out cases
         // Cannot search for a conditional enhancement if conditional enhancements are not enabled
-        if (type == StatusType.SelfConditionalEnhancement && !this.hudNodeMap.IsConditionalEnhancementsEnabled()) { return false; }
+        if (type == StatusType.SelfConditionalEnhancement && !hudNodeMap.IsConditionalEnhancementsEnabled()) { return false; }
 
         this.statuses.Clear();
 
-        var isConditionalEnhancementsEnabled = this.hudNodeMap.IsConditionalEnhancementsEnabled();
-        var isOwnEnhancementsPrioritized = this.hudNodeMap.IsOwnEnhancementsPrioritized();
-        var isOthersEnhancementsDisplayedInOthers = this.hudNodeMap.IsOthersEnhancementsDisplayedInOthers();
+        var isConditionalEnhancementsEnabled = hudNodeMap.IsConditionalEnhancementsEnabled();
+        var isOwnEnhancementsPrioritized = hudNodeMap.IsOwnEnhancementsPrioritized();
+        var isOthersEnhancementsDisplayedInOthers = hudNodeMap.IsOthersEnhancementsDisplayedInOthers();
         var localPlayerId = GetLocalPlayerId();
 
         // Fill status list with relevant statuses to sort
         foreach (var s in allStatuses)
         {
             if (s.StatusId == 0) { continue; }
-            var luminaStatuses = this.dataManager.GetExcelSheet<Lumina.Excel.Sheets.Status>(this.clientState.ClientLanguage);
+            var luminaStatuses = dalamud.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Status>(dalamud.ClientState.ClientLanguage);
             if (!luminaStatuses.TryGetRow(s.StatusId, out var luminaStatus)) { continue; }
             var statusInfo = new Status(luminaStatus)
             {

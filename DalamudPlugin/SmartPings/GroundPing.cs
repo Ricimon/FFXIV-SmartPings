@@ -11,11 +11,13 @@ public class GroundPing
         Question = 2,
         Danger = 3,
         Assist = 4,
+        OnMyWay = 5,
     }
 
     public Type PingType;
     public long StartTimestamp;
     public string? Author;
+    public ulong AuthorId;
     public string? MapId;
     public Vector3 WorldPosition;
     public float DrawDuration;

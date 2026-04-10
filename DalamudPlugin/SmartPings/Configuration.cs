@@ -2,6 +2,7 @@
 using Dalamud.Game.ClientState.Keys;
 using Dalamud.Plugin;
 using NLog;
+using SmartPings.Audio;
 using SmartPings.Data;
 using System;
 
@@ -16,6 +17,7 @@ namespace SmartPings
         public bool PublicRoom { get; set; }
         public string RoomName { get; set; } = string.Empty;
         public string RoomPassword { get; set; } = string.Empty;
+        public bool AutoJoinPrivateRoomOnLogin { get; set; } = false;
 
         public int SelectedAudioOutputDeviceIndex { get; set; } = -1;
 
@@ -33,13 +35,18 @@ namespace SmartPings
         public bool SendGuiPingsToXivChat { get; set; }
         public XivChatSendLocation XivChatSendLocation { get; set; } = XivChatSendLocation.Active;
 
+        public bool OnlyEnableInCombat { get; set; } = false;
+        public bool PingKeybindBlocksGameInput { get; set; } = false;
+
+        public float UiScale { get; set; } = 1.0f;
+
         public float MasterVolume { get; set; } = 1.0f;
         public int MaxConcurrentSfx { get; set; } = 5;
+        public PingSounds.Pack ActiveSoundPack { get; set; } = PingSounds.Pack.LeagueOfLegends;
         public bool EnableSpatialization { get; set; } = true;
         public float SpatializationMinimumDistance { get; set; } = 5.0f;
 
         public bool PlayRoomJoinAndLeaveSounds { get; set; } = true;
-        public bool KeybindsRequireGameFocus { get; set; }
         public bool PrintLogsToChat { get; set; }
 
         public int MinimumVisibleLogLevel { get; set; } = LogLevel.Info.Ordinal;

@@ -1,39 +1,34 @@
-﻿using Dalamud.Plugin.Services;
+﻿using System;
+using System.Text;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
-using Lumina.Excel.Sheets;
 using SmartPings.Extensions;
 using SmartPings.Log;
-using System;
-using System.Text;
 
 namespace SmartPings;
 
-public class MapManager : IDisposable
+public sealed class MapManager : IDisposable
 {
-    public ushort CurrentTerritoryId => this.clientState.TerritoryType;
-    public uint CurrentMapId => this.clientState.MapId;
+    public ushort CurrentTerritoryId => this.dalamud.ClientState.TerritoryType;
+    public uint CurrentMapId => this.dalamud.ClientState.MapId;
 
-    public event System.Action? OnMapChanged;
+    public event Action? OnMapChanged;
 
-    private readonly IClientState clientState;
-    private readonly IDataManager dataManager;
+    private readonly DalamudServices dalamud;
     private readonly ILogger logger;
 
-    public MapManager(IClientState clientState, IDataManager dataManager, ILogger logger)
+    public MapManager(DalamudServices dalamud, ILogger logger)
     {
-        this.clientState = clientState;
-        this.dataManager = dataManager;
+        this.dalamud = dalamud;
         this.logger = logger;
 
-        this.clientState.TerritoryChanged += OnTerritoryChanged;
-        OnTerritoryChanged(this.clientState.TerritoryType);
+        this.dalamud.ClientState.TerritoryChanged += OnTerritoryChanged;
+        OnTerritoryChanged(this.dalamud.ClientState.TerritoryType);
     }
 
     public void Dispose()
     {
-        this.clientState.TerritoryChanged -= OnTerritoryChanged;
-        GC.SuppressFinalize(this);
+        this.dalamud.ClientState.TerritoryChanged -= OnTerritoryChanged;
     }
 
     public unsafe bool InSharedWorldMap()
@@ -85,9 +80,6 @@ public class MapManager : IDisposable
             default:
                 return false;
         }
-
-        //var currentCfc = this.dataManager.GetExcelSheet<ContentFinderCondition>().GetRow(GameMain.Instance()->CurrentContentFinderConditionId);
-        //return currentCfc.RowId is 0;
     }
 
     public unsafe string GetCurrentMapPublicRoomName()
@@ -96,9 +88,10 @@ public class MapManager : IDisposable
         if (InSharedWorldMap())
         {
             s.Append('_');
-            if (this.clientState.LocalPlayer != null)
+            var world = this.dalamud.PlayerState.CurrentWorld;
+            if (world.IsValid)
             {
-                s.Append(this.clientState.LocalPlayer.CurrentWorld.Value.Name.ToString());
+                s.Append(world.Value.Name.ToString());
             }
             else
             {
@@ -139,8 +132,6 @@ public class MapManager : IDisposable
                     {
                         s.Append("_d"); s.Append(division);
                     }
-                    //s.Append("_r"); s.Append(housingManager->GetCurrentRoom());
-                    //s.Append("_p"); s.Append(housingManager->GetCurrentPlot());
                 }
             }
         }

@@ -1,18 +1,17 @@
-﻿using AsyncAwaitBestPractices;
-using SmartPings.Log;
-using SocketIO.Serializer.SystemTextJson;
-using SocketIOClient;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using AsyncAwaitBestPractices;
+using Newtonsoft.Json;
+using SmartPings.Log;
+using SocketIO.Serializer.NewtonsoftJson;
+using SocketIOClient;
 
 namespace SmartPings.Network;
 
-public class ServerConnectionChannel : IDisposable
+public sealed class ServerConnectionChannel : IDisposable
 {
     // Since Dalamud 12, for some reason accessing socket parameters such as socket.Connected from the UI thread
     // would crash the game. So, intermediate field booleans are now used to indicate state to the UI.
@@ -71,14 +70,13 @@ public class ServerConnectionChannel : IDisposable
                 socketOptions.Path = pathMatch.Groups[2].Value;
             }
 
-            this.socket = new SocketIOClient.SocketIO(serverUrl, socketOptions);
-            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            this.socket = new SocketIOClient.SocketIO(serverUrl, socketOptions)
             {
-                IncludeFields = true,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                Serializer = new NewtonsoftJsonSerializer(new JsonSerializerSettings
+                {
+                    NullValueHandling = NullValueHandling.Ignore,
+                }),
             };
-            options.Converters.Add(new JsonStringEnumConverter());
-            this.socket.Serializer = new SystemTextJsonSerializer(options);
             this.AddListeners();
         }
 
@@ -160,12 +158,12 @@ public class ServerConnectionChannel : IDisposable
 
     public void Dispose()
     {
+        DisconnectAsync();
         this.OnConnected = null;
         this.OnReady = null;
         this.OnMessage = null;
         this.OnDisconnected = null;
         this.DisposeSocket();
-        GC.SuppressFinalize(this);
     }
 
     private void AddListeners()

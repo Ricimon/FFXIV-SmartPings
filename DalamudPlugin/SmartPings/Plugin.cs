@@ -1,18 +1,15 @@
 ﻿using System.Collections.Generic;
-using Dalamud.Plugin;
 using SmartPings.Audio;
 using SmartPings.Log;
 
 namespace SmartPings;
 
 public class Plugin(
-    IDalamudPluginInterface pluginInterface,
     IEnumerable<IDalamudHook> dalamudHooks,
     IAudioDeviceController audioDeviceController,
     Spatializer spatializer,
     ILogger logger)
 {
-    private IDalamudPluginInterface PluginInterface { get; init; } = pluginInterface;
     private IEnumerable<IDalamudHook> DalamudHooks { get; init; } = dalamudHooks;
     private IAudioDeviceController AudioDeviceController { get; init; } = audioDeviceController;
     private Spatializer Spatializer { get; init; } = spatializer;

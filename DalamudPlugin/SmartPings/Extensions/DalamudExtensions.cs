@@ -2,6 +2,7 @@
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -22,14 +23,25 @@ public static class DalamudExtensions
         return playerName;
     }
 
-    public static string? GetLocalPlayerFullName(this IClientState clientState)
+    public static string? GetLocalPlayerFullName(this IPlayerState playerState)
     {
-        var localPlayer = clientState.LocalPlayer;
-        if (localPlayer == null)
+        if (!playerState.IsLoaded) { return null; }
+
+        string playerName = playerState.CharacterName;
+        var homeWorld = playerState.HomeWorld;
+        if (homeWorld.IsValid)
         {
-            return null;
+            playerName += $"@{homeWorld.Value.Name.ExtractText()}";
         }
-        return GetPlayerFullName(localPlayer);
+
+        return playerName;
+    }
+
+    public static unsafe ulong GetPlayerContentId(this IPlayerCharacter playerCharacter)
+    {
+        BattleChara* bChara = (BattleChara*)playerCharacter.Address;
+        if (bChara == null) { return 0; }
+        return bChara->ContentId;
     }
 
     public static IEnumerable<IPlayerCharacter> GetPlayers(this IObjectTable objectTable)

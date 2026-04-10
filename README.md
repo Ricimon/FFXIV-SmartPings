@@ -15,7 +15,7 @@ This plugin adds networked ground and UI pings to FFXIV as a Dalamud plugin.
 ### UI Pings
 ![](images/ui_pings.gif)
 
-## Support discord
+## Support Discord
 
 [![Discord Banner](https://discord.com/api/guilds/669688899248979968/widget.png?style=banner2)](https://discord.gg/rSucAJ6A7u)
 
@@ -26,11 +26,11 @@ This plugin adds networked ground and UI pings to FFXIV as a Dalamud plugin.
 ```
 https://raw.githubusercontent.com/Ricimon/FFXIV-ProximityVoiceChat/refs/heads/master/repo.json
 ```
-*Both ProximityVoiceChat and SmartPings are accessible from the ProximityVoiceChat repo json*
+*All my plugins, including SmartPings, are accessible from the ProximityVoiceChat repo json*
 - Click the **+** button to the right of the text field and make sure the **Enabled checkmark** is checked.
 - Click on the **Save Button** on the bottom-right of the window.
 
-This adds plugins from this repo as installable plugins in the available plugins list. To then install the plugin itself,
+This adds plugins from this custom repo as installable plugins in the available plugins list. To then install the plugin itself,
 
 - Enter `/xlplugins` in the chat window and go to the **All Plugins** tab in the opened window.
 - Search for the **SmartPings** plugin and click **install**.
@@ -44,6 +44,8 @@ Keybinds are adjustable in the plugin config settings, which can be opened by ty
 To send and receive pings from other players, join either a public or private room.<br />
 A public room will automatically match you with players in your map, while private rooms are password protected and keeps your room between map changes.
 
+Ground pings have accompanying sound effects, which can be adjusted in the plugin config settings.
+
 UI pings are sent through echo chat by default, but can be configured to send through in-game chat, such as party chat. However, use this feature with caution, as in-game chat logs are recorded by Square Enix.
 
 Currently supported UI pings:
@@ -53,8 +55,12 @@ Currently supported UI pings:
 - Target statuses
 - Target HP
 
+## Todo
+
+- Sound effects for default sound pack
+
 ## Contributing
-Please use the support discord for idea and code contribution discussion.
+Please use the support Discord for idea and code contribution discussion.
 
 This plugin's servers are self-hosted and the development team is one person, so any donations are well appreciated.
 

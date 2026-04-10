@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using Windows.ApplicationModel.Background;
 using WindowsInput;
 using WindowsInput.Events;
 using WindowsInput.Events.Sources;
 
 namespace SmartPings.Input;
 
-public class InputEventSource(Configuration configuration) : IDisposable
+public sealed class InputEventSource : IDisposable
 {
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
@@ -32,7 +31,6 @@ public class InputEventSource(Configuration configuration) : IDisposable
         }
     }
 
-    private readonly Configuration configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
     private readonly List<Action<KeyDown>> subscribedKeyDownActions = [];
     private readonly List<Action<KeyUp>> subscribedKeyUpActions = [];
 
@@ -53,7 +51,6 @@ public class InputEventSource(Configuration configuration) : IDisposable
             mouse.ButtonUp -= OnMouseButtonUp;
         }
         mouse?.Dispose();
-        GC.SuppressFinalize(this);
     }
 
     public void SubscribeToKeyDown(Action<KeyDown> action)
@@ -100,8 +97,6 @@ public class InputEventSource(Configuration configuration) : IDisposable
 
     private void OnKeyboardKeyDown(object? o, EventSourceEventArgs<KeyDown> e)
     {
-        if (this.configuration.KeybindsRequireGameFocus && !IsGameFocused()) { return; }
-
         foreach (var action in subscribedKeyDownActions)
         {
             action.Invoke(e.Data);
@@ -119,8 +114,6 @@ public class InputEventSource(Configuration configuration) : IDisposable
 
     private void OnMouseButtonDown(object? o, EventSourceEventArgs<ButtonDown> e)
     {
-        if (this.configuration.KeybindsRequireGameFocus && !IsGameFocused()) { return; }
-
         KeyCode keyCode;
         switch(e.Data.Button)
         {

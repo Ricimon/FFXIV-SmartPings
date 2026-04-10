@@ -1,17 +1,17 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Text;
+using System.Text.RegularExpressions;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Keys;
+using Dalamud.Interface;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
-using Dalamud.Plugin;
-using Dalamud.Plugin.Services;
 using Reactive.Bindings;
 using SmartPings.Audio;
 using SmartPings.Data;
@@ -20,10 +20,11 @@ using SmartPings.Input;
 using SmartPings.Log;
 using SmartPings.Network;
 using SmartPings.UI.Util;
+using ZLinq;
 
 namespace SmartPings.UI.View;
 
-public class MainWindow : Window, IPluginUIView, IDisposable
+public sealed class MainWindow : Window, IPluginUIView, IDisposable
 {
     // this extra bool exists for ImGui, since you can't ref a property
     private bool visible = false;
@@ -36,6 +37,8 @@ public class MainWindow : Window, IPluginUIView, IDisposable
     public IReactiveProperty<bool> PublicRoom { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<string> RoomName { get; } = new ReactiveProperty<string>(string.Empty);
     public IReactiveProperty<string> RoomPassword { get; } = new ReactiveProperty<string>(string.Empty);
+    public IObservable<bool> AutoJoinPrivateRoomOnLogin => autoJoinPrivateRoomOnLogin;
+    private readonly Subject<bool> autoJoinPrivateRoomOnLogin = new();
 
     private readonly Subject<Unit> joinRoom = new();
     public IObservable<Unit> JoinRoom => joinRoom.AsObservable();
@@ -54,9 +57,11 @@ public class MainWindow : Window, IPluginUIView, IDisposable
     public IReactiveProperty<bool> SendGuiPingsToCustomServer { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<bool> SendGuiPingsToXivChat { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<XivChatSendLocation> XivChatSendLocation { get; } = new ReactiveProperty<XivChatSendLocation>();
+    public IReactiveProperty<float> UiScale { get; } = new ReactiveProperty<float>();
 
     public IReactiveProperty<int> SelectedAudioOutputDeviceIndex { get; } = new ReactiveProperty<int>(-1);
     public IReactiveProperty<float> MasterVolume { get; } = new ReactiveProperty<float>();
+    public IReactiveProperty<PingSounds.Pack> ActiveSoundPack { get; } = new ReactiveProperty<PingSounds.Pack>();
     public IReactiveProperty<bool> EnableSpatialization { get; } = new ReactiveProperty<bool>();
 
     public IObservable<Unit> PrintNodeMap1 => printNodeMap1.AsObservable();
@@ -69,62 +74,78 @@ public class MainWindow : Window, IPluginUIView, IDisposable
     private readonly Subject<Unit> printTargetStatuses = new();
 
     public IReactiveProperty<bool> PlayRoomJoinAndLeaveSounds { get; } = new ReactiveProperty<bool>();
-    public IReactiveProperty<bool> KeybindsRequireGameFocus { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<bool> PrintLogsToChat { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<int> MinimumVisibleLogLevel { get; } = new ReactiveProperty<int>();
 
     private readonly WindowSystem windowSystem;
-    private readonly IDalamudPluginInterface pluginInterface;
-    private readonly ITextureProvider textureProvider;
+    private readonly AdvancedConfigWindow advancedConfigWindow;
+    private readonly DalamudServices dalamud;
     private readonly ServerConnection serverConnection;
     private readonly MapManager mapChangeHandler;
     private readonly Configuration configuration;
-    private readonly IClientState clientState;
     private readonly IAudioDeviceController audioDeviceController;
     private readonly ILogger logger;
 
+    private readonly string windowName;
     private readonly string[] groundPingTypes;
+    private readonly string[] soundPacks;
     private readonly string[] xivChatSendLocations;
     private readonly string[] falloffTypes;
     private readonly string[] allLoggingLevels;
 
     private string? createPrivateRoomButtonText;
 
-    private string[]? inputDevices;
     private string[]? outputDevices;
 
     public MainWindow(
         WindowSystem windowSystem,
-        IDalamudPluginInterface pluginInterface,
-        ITextureProvider textureProvider,
+        AdvancedConfigWindow advancedConfigWindow,
+        DalamudServices dalamud,
         ServerConnection serverConnection,
         MapManager mapChangeHandler,
         Configuration configuration,
-        IClientState clientState,
         IAudioDeviceController audioDeviceController,
         ILogger logger) : base(
         PluginInitializer.Name)
     {
         this.windowSystem = windowSystem;
-        this.pluginInterface = pluginInterface;
-        this.textureProvider = textureProvider;
+        this.advancedConfigWindow = advancedConfigWindow;
+        this.dalamud = dalamud;
         this.serverConnection = serverConnection;
         this.mapChangeHandler = mapChangeHandler;
         this.configuration = configuration;
-        this.clientState = clientState;
         this.audioDeviceController = audioDeviceController;
         this.logger = logger;
-        this.groundPingTypes = Enum.GetNames<GroundPing.Type>();
+
+        var version = GetType().Assembly.GetName().Version?.ToString() ?? string.Empty;
+        this.windowName = PluginInitializer.Name;
+        if (version.Length > 0)
+        {
+            var versionArray = version.Split(".");
+            version = versionArray.AsValueEnumerable().Take(3).JoinToString(".");
+            this.windowName += $" v{version}";
+        }
+#if DEBUG
+        this.windowName += " (DEBUG)";
+#endif
+        this.groundPingTypes = Enum.GetNames<GroundPing.Type>().AsValueEnumerable()
+            .Select(s => Regex.Replace(s, "(\\B[A-Z])", " $1")).ToArray();
+        this.soundPacks = Enum.GetNames<PingSounds.Pack>();
         this.xivChatSendLocations = Enum.GetNames<XivChatSendLocation>();
         this.falloffTypes = Enum.GetNames<AudioFalloffModel.FalloffType>();
-        this.allLoggingLevels = [.. LogLevel.AllLoggingLevels.Select(l => l.Name)];
+        this.allLoggingLevels = LogLevel.AllLoggingLevels.AsValueEnumerable().Select(l => l.Name).ToArray();
         windowSystem.AddWindow(this);
+
+#if DEBUG
+        visible = true;
+#endif
     }
 
     public override void Draw()
     {
         if (!Visible)
         {
+            this.advancedConfigWindow.Visible = false;
             this.createPrivateRoomButtonText = null;
             return;
         }
@@ -132,7 +153,7 @@ public class MainWindow : Window, IPluginUIView, IDisposable
         var width = 350;
         ImGui.SetNextWindowSize(new Vector2(width, 400), ImGuiCond.FirstUseEver);
         ImGui.SetNextWindowSizeConstraints(new Vector2(width, 250), new Vector2(float.MaxValue, float.MaxValue));
-        if (ImGui.Begin("SmartPings", ref this.visible))
+        if (ImGui.Begin(this.windowName, ref this.visible))
         {
             DrawContents();
         }
@@ -142,7 +163,6 @@ public class MainWindow : Window, IPluginUIView, IDisposable
     public void Dispose()
     {
         windowSystem.RemoveWindow(this);
-        GC.SuppressFinalize(this);
     }
 
     private void DrawContents()
@@ -232,18 +252,28 @@ public class MainWindow : Window, IPluginUIView, IDisposable
         }
         ImGui.SameLine(); Common.HelpMarker("Sets the password if joining your own room");
 
-        ImGui.BeginDisabled(this.serverConnection.InRoom);
-        if (this.createPrivateRoomButtonText == null || !this.serverConnection.InRoom)
+        using (ImRaii.Disabled(string.IsNullOrEmpty(roomName)))
         {
-            var playerName = this.clientState.GetLocalPlayerFullName();
-            this.createPrivateRoomButtonText = roomName.Length == 0 || roomName == playerName ?
-                "Create Private Room" : "Join Private Room";
+            bool autoJoinPrivateRoomOnLogin = this.configuration.AutoJoinPrivateRoomOnLogin;
+            if (ImGui.Checkbox("Auto-join on login", ref autoJoinPrivateRoomOnLogin))
+            {
+                this.autoJoinPrivateRoomOnLogin.OnNext(autoJoinPrivateRoomOnLogin);
+            }
         }
-        if (ImGui.Button(this.createPrivateRoomButtonText))
+
+        using (ImRaii.Disabled(this.serverConnection.InRoom))
         {
-            this.joinRoom.OnNext(Unit.Default);
+            if (this.createPrivateRoomButtonText == null || !this.serverConnection.InRoom)
+            {
+                var playerName = this.dalamud.PlayerState.GetLocalPlayerFullName();
+                this.createPrivateRoomButtonText = roomName.Length == 0 || roomName == playerName ?
+                    "Create Private Room" : "Join Private Room";
+            }
+            if (ImGui.Button(this.createPrivateRoomButtonText))
+            {
+                this.joinRoom.OnNext(Unit.Default);
+            }
         }
-        ImGui.EndDisabled();
 
         var dcMsg = this.serverConnection.Channel?.LatestServerDisconnectMessage;
         if (dcMsg != null)
@@ -298,7 +328,7 @@ public class MainWindow : Window, IPluginUIView, IDisposable
         var indent = 10;
         ImGui.Indent(indent);
 
-        foreach (var (playerName, index) in this.serverConnection.PlayersInRoom.Select((p, i) => (p, i)))
+        foreach (var (playerName, index) in this.serverConnection.PlayersInRoom.AsValueEnumerable().Select((p, i) => (p, i)))
         {
             Vector4 color = Vector4Colors.Red;
             string tooltip = "Connection Error";
@@ -416,6 +446,21 @@ public class MainWindow : Window, IPluginUIView, IDisposable
 
         ImGui.Text("Keybinds");
         ImGui.SameLine(); Common.HelpMarker("Right click to clear a keybind.");
+
+        using (var iconFont = ImRaii.PushFont(UiBuilder.IconFont))
+        {
+            var cogIcon = FontAwesomeIcon.Cog.ToIconString();
+            ImGui.SameLine(ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X - ImGuiHelpers.GetButtonSize(cogIcon).X);
+            if (ImGui.Button(cogIcon))
+            {
+                this.advancedConfigWindow.Visible = true;
+            }
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Advanced");
+        }
+
         using (ImRaii.PushIndent())
         {
             DrawKeybindEdit(Keybind.Ping, this.configuration.PingKeybind, "Ping Keybind",
@@ -442,7 +487,6 @@ public class MainWindow : Window, IPluginUIView, IDisposable
             {
                 this.EnablePingWheel.Value = enablePingWheel;
             }
-            ImGui.SameLine(); Common.HelpMarker("More ping types coming soon™");
 
             using (ImRaii.ItemWidth(100))
             {
@@ -510,6 +554,17 @@ public class MainWindow : Window, IPluginUIView, IDisposable
 
         ImGui.Dummy(new Vector2(0.0f, 5.0f)); // ---------------
 
+        using (ImRaii.ItemWidth(200))
+        {
+            var uiScale = this.UiScale.Value * 100.0f;
+            if (ImGui.SliderFloat("Ping UI Scale", ref uiScale, 0.0f, 200.0f, "%1.0f%%"))
+            {
+                this.UiScale.Value = uiScale / 100.0f;
+            }
+        }
+
+        ImGui.Dummy(new Vector2(0.0f, 5.0f)); // ---------------
+
         ImGui.Text("Audio");
         using (ImRaii.PushIndent())
         using (var deviceTable = ImRaii.Table("AudioDevices", 2))
@@ -544,12 +599,24 @@ public class MainWindow : Window, IPluginUIView, IDisposable
                 ImGui.TableNextRow(); ImGui.TableNextColumn();
 
                 ImGui.AlignTextToFramePadding();
-                ImGui.Text("Master Volume"); ImGui.TableNextColumn();
+                ImGui.Text("Master Volume");
+                ImGui.TableNextColumn();
                 ImGui.SetNextItemWidth(ImGui.GetColumnWidth());
                 var masterVolume = this.MasterVolume.Value * 100.0f;
                 if (ImGui.SliderFloat("##MasterVolume", ref masterVolume, 0.0f, 200.0f, "%1.0f%%"))
                 {
                     this.MasterVolume.Value = masterVolume / 100.0f;
+                }
+
+                ImGui.TableNextRow(); ImGui.TableNextColumn();
+                ImGui.AlignTextToFramePadding();
+                ImGui.Text("Sound Pack");
+                ImGui.TableNextColumn();
+                ImGui.SetNextItemWidth(ImGui.GetColumnWidth());
+                var activeSoundPack = (int)this.ActiveSoundPack.Value;
+                if (ImGui.Combo("##SoundPack", ref activeSoundPack, this.soundPacks, this.soundPacks.Length))
+                {
+                    this.ActiveSoundPack.Value = (PingSounds.Pack)activeSoundPack;
                 }
 
                 ImGui.TableNextRow(); ImGui.TableNextColumn();

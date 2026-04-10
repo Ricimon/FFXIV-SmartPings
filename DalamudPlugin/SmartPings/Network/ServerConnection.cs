@@ -1,21 +1,21 @@
-﻿using AsyncAwaitBestPractices;
-using Dalamud.Game.Text;
-using Dalamud.Plugin;
-using Dalamud.Plugin.Services;
-using SmartPings.Extensions;
-using SmartPings.Log;
-using SocketIOClient;
-using System;
+﻿using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using System.Threading.Tasks;
+using AsyncAwaitBestPractices;
+using SmartPings.Data;
+using SmartPings.Extensions;
+using SmartPings.Log;
+using SocketIOClient;
+using ZLinq;
 
 namespace SmartPings.Network;
 
-public class ServerConnection : IDisposable
+public sealed class ServerConnection : IDisposable
 {
     /// <summary>
     /// When in a public room, this plugin will automatically switch rooms when the player changes maps.
@@ -50,38 +50,35 @@ public class ServerConnection : IDisposable
 
     private const string PeerType = "player";
 
-    private readonly IClientState clientState;
-    private readonly IObjectTable objectTable;
-    private readonly IFramework framework;
-    private readonly IChatGui chatGui;
+    private readonly DalamudServices dalamud;
     private readonly MapManager mapManager;
     private readonly Lazy<GroundPingPresenter> groundPingPresenter;
+    private readonly Lazy<GuiPingHandler> guiPingHandler;
+    private readonly Configuration configuration; // client plugin settings
     private readonly ILogger logger;
 
-    private readonly LoadConfig loadConfig;
+    private readonly LoadConfig loadConfig; // server URL and key
 
     private string? localPlayerFullName;
     private string[]? playersInRoom;
+    private bool isAutoJoin;
 
     public ServerConnection(
-        IDalamudPluginInterface pluginInterface,
-        IClientState clientState,
-        IObjectTable objectTable,
-        IFramework framework,
-        IChatGui chatGui,
+        DalamudServices dalamud,
         MapManager mapManager,
         Lazy<GroundPingPresenter> groundPingPresenter,
+        Lazy<GuiPingHandler> guiPingHandler,
+        Configuration configuration,
         ILogger logger)
     {
-        this.clientState = clientState;
-        this.objectTable = objectTable;
-        this.framework = framework;
-        this.chatGui = chatGui;
+        this.dalamud = dalamud;
         this.mapManager = mapManager;
         this.groundPingPresenter = groundPingPresenter;
+        this.guiPingHandler = guiPingHandler;
+        this.configuration = configuration;
         this.logger = logger;
 
-        var configPath = Path.Combine(pluginInterface.AssemblyLocation.DirectoryName ?? string.Empty, "config.json");
+        var configPath = Path.Combine(this.dalamud.PluginInterface.AssemblyLocation.DirectoryName ?? string.Empty, "config.json");
         this.loadConfig = null!;
         if (File.Exists(configPath))
         {
@@ -98,14 +95,15 @@ public class ServerConnection : IDisposable
             this.loadConfig = new();
         }
 
-        this.clientState.Logout += OnLogout;
+        this.dalamud.ClientState.Login += OnLogin;
+        this.dalamud.ClientState.Logout += OnLogout;
     }
 
     public void Dispose()
     {
         this.Channel?.Dispose();
-        this.clientState.Logout -= OnLogout;
-        GC.SuppressFinalize(this);
+        this.dalamud.ClientState.Login -= OnLogin;
+        this.dalamud.ClientState.Logout -= OnLogout;
     }
 
     public void JoinPublicRoom()
@@ -149,6 +147,7 @@ public class ServerConnection : IDisposable
         this.InRoom = false;
         this.localPlayerFullName = null;
         this.playersInRoom = null;
+        this.isAutoJoin = false;
 
         //if (this.configuration.PlayRoomJoinAndLeaveSounds)
         //{
@@ -166,11 +165,8 @@ public class ServerConnection : IDisposable
 
         if (this.Channel != null)
         {
-            //this.Channel.OnConnected -= OnSignalingServerConnected;
-            //this.Channel.OnReady -= OnSignalingServerReady;
-            //this.Channel.OnDisconnected -= OnSignalingServerDisconnected;
-            //this.Channel.OnErrored -= OnSignalingServerDisconnected;
             this.Channel.OnMessage -= OnMessage;
+            this.Channel.OnDisconnected -= OnDisconnect;
             return this.Channel.DisconnectAsync();
         }
         else
@@ -183,6 +179,11 @@ public class ServerConnection : IDisposable
     {
         if (this.Channel == null || !this.Channel.Connected) { return; }
 
+        var authorId = new byte[8];
+        BinaryPrimitives.WriteUInt64BigEndian(authorId, ping.AuthorId);
+        var startTimestamp = new byte[8];
+        BinaryPrimitives.WriteInt64BigEndian(startTimestamp, ping.StartTimestamp);
+
         this.Channel.SendAsync(new ServerMessage.Payload
         {
             action = ServerMessage.Payload.Action.AddGroundPing,
@@ -190,7 +191,8 @@ public class ServerConnection : IDisposable
             {
                 pingType = ping.PingType,
                 author = ping.Author ?? string.Empty,
-                startTimestamp = ping.StartTimestamp,
+                authorId = authorId,
+                startTimestamp = startTimestamp,
                 mapId = ping.MapId ?? string.Empty,
                 worldPositionX = ping.WorldPosition.X,
                 worldPositionY = ping.WorldPosition.Y,
@@ -199,19 +201,35 @@ public class ServerConnection : IDisposable
         }).SafeFireAndForget(ex => this.logger.Error(ex.ToString()));
     }
 
-    public void SendChatMessage(XivChatEntry chatEntry)
+    public void SendUiPing(string sourceName, HudElementInfo hudElementInfo)
     {
         if (this.Channel == null || !this.Channel.Connected) { return; }
 
         this.Channel.SendAsync(new ServerMessage.Payload
         {
-            action = ServerMessage.Payload.Action.SendChatMessage,
-            chatMessagePayload = new ServerMessage.Payload.ChatMessagePayload
+            action = ServerMessage.Payload.Action.SendUiPing,
+            uiPingPayload = new ServerMessage.Payload.UiPingPayload
             {
-                chatType = chatEntry.Type ?? XivChatType.None,
-                message = chatEntry.MessageBytes,
+                sourceName = sourceName,
+                hudElementInfo = hudElementInfo,
             }
         });
+    }
+
+    private void OnLogin()
+    {
+        if (this.configuration.AutoJoinPrivateRoomOnLogin)
+        {
+            if (string.IsNullOrEmpty(this.configuration.RoomName) ||
+                string.IsNullOrEmpty(this.configuration.RoomPassword))
+            {
+                this.logger.Warn("No private room credentials found to auto-join.");
+                return;
+            }
+            this.isAutoJoin = true;
+            this.dalamud.ChatGui.Print($"Auto-joining {this.configuration.RoomName}'s room.", PluginInitializer.Name);
+            JoinPrivateRoom(this.configuration.RoomName, this.configuration.RoomPassword);
+        }
     }
 
     private void OnLogout(int type, int code)
@@ -221,10 +239,10 @@ public class ServerConnection : IDisposable
 
     private IEnumerable<string> GetOtherPlayerNamesInInstance()
     {
-        return this.objectTable.GetPlayers()
+        return this.dalamud.ObjectTable.GetPlayers()
             .Select(p => p.GetPlayerFullName())
             .Where(s => s != null)
-            .Where(s => s != this.clientState.GetLocalPlayerFullName())
+            .Where(s => s != this.dalamud.PlayerState.GetLocalPlayerFullName())
             .Cast<string>();
     }
 
@@ -238,7 +256,7 @@ public class ServerConnection : IDisposable
 
         this.logger.Debug("Attemping to join room.");
 
-        var playerName = this.clientState.GetLocalPlayerFullName();
+        var playerName = this.dalamud.PlayerState.GetLocalPlayerFullName();
         if (playerName == null)
         {
 #if DEBUG
@@ -270,6 +288,7 @@ public class ServerConnection : IDisposable
         }
 
         this.Channel.OnMessage += OnMessage;
+        this.Channel.OnDisconnected += OnDisconnect;
 
         this.logger.Debug("Attempting to connect to server.");
         this.Channel.ConnectAsync(roomName, roomPassword, playersInInstance).SafeFireAndForget(ex =>
@@ -294,7 +313,7 @@ public class ServerConnection : IDisposable
                 // Also in some housing districts, the mapId is different after the OnTerritoryChanged event
                 await Task.Delay(1000);
                 // Accessing the object table must happen on the main thread
-                this.framework.Run(() =>
+                this.dalamud.Framework.Run(() =>
                 {
                     var roomName = this.mapManager.GetCurrentMapPublicRoomName();
                     string[]? otherPlayers = this.mapManager.InSharedWorldMap() ? null : GetOtherPlayerNamesInInstance().ToArray();
@@ -313,6 +332,11 @@ public class ServerConnection : IDisposable
             message = response.GetValue<ServerMessage>();
             payload = message.payload;
         }
+        catch (JsonException jsonEx)
+        {
+            this.logger.Error("Failed to read server JSON data. You may need to update the plugin. Error:\n{0}", jsonEx.ToString());
+            return;
+        }
         catch (Exception e)
         {
             this.logger.Error(e.ToString());
@@ -325,12 +349,33 @@ public class ServerConnection : IDisposable
                 this.playersInRoom = payload.players;
                 break;
             case ServerMessage.Payload.Action.AddGroundPing:
-                AddGroundPing(payload.groundPingPayload);
+                if (payload.groundPingPayload.HasValue)
+                {
+                    AddGroundPing(payload.groundPingPayload.Value);
+                }
                 break;
-            case ServerMessage.Payload.Action.SendChatMessage:
-                PrintChatMessage(payload.chatMessagePayload);
+            case ServerMessage.Payload.Action.SendUiPing:
+                if (payload.uiPingPayload.HasValue)
+                {
+                    EchoUiPing(payload.uiPingPayload.Value);
+                }
+                break;
+            case ServerMessage.Payload.Action.Close:
+                // Temp logic to update the player list before the server gets fixed to send a player list update
+                this.playersInRoom = this.playersInRoom?.AsValueEnumerable().Where(p => p != message.from).ToArray();
                 break;
         }
+    }
+
+    private void OnDisconnect()
+    {
+        if (this.isAutoJoin)
+        {
+            this.dalamud.ChatGui.PrintError($"Failed to auto join {this.configuration.RoomName}'s room.", PluginInitializer.Name);
+            this.configuration.AutoJoinPrivateRoomOnLogin = false;
+            this.configuration.Save();
+        }
+        this.isAutoJoin = false;
     }
 
     private void AddGroundPing(ServerMessage.Payload.GroundPingPayload payload)
@@ -339,7 +384,6 @@ public class ServerConnection : IDisposable
         {
             PingType = payload.pingType,
             Author = payload.author,
-            StartTimestamp = payload.startTimestamp,
             MapId = payload.mapId,
             WorldPosition = new Vector3
             {
@@ -348,16 +392,17 @@ public class ServerConnection : IDisposable
                 Z = payload.worldPositionZ,
             },
         };
+        BinaryPrimitives.TryReadUInt64BigEndian(payload.authorId, out ping.AuthorId);
+        BinaryPrimitives.TryReadInt64BigEndian(payload.startTimestamp, out ping.StartTimestamp);
         this.groundPingPresenter.Value.GroundPings.AddLast(ping);
     }
 
-    private void PrintChatMessage(ServerMessage.Payload.ChatMessagePayload payload)
+    private void EchoUiPing(ServerMessage.Payload.UiPingPayload payload)
     {
-        var xivMsg = new XivChatEntry
+        var echoMsg = GuiPingHandler.CreateUiPingString(GuiPingHandler.UiPingType.Echo, payload.sourceName, payload.hudElementInfo).Item1;
+        if (echoMsg != null)
         {
-            Type = payload.chatType,
-            MessageBytes = payload.message
-        };
-        this.chatGui.Print(xivMsg);
+            this.guiPingHandler.Value.EchoUiPing(echoMsg);
+        }
     }
 }
