@@ -50,7 +50,8 @@ public struct Status
     // Some statuses are invisible and are in the status list but are not shown in any UI
     // Class-based damage buff in Criterion (ParamEffect 31)
     // Hoofing It in Occult Crescent (Id 1778)
-    public readonly bool IsVisible => ParamEffect != 31 && Id != 1778;
+    // Buffs in Advanced (Id 3355, 3356) (Id 3355 has ParamEffect 29)
+    public readonly bool IsVisible => ParamEffect != 31 && Id != 1778 && Id != 3355 && Id != 3356;
 
     public Status(Lumina.Excel.Sheets.Status luminaStatus)
     {
