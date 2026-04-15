@@ -1,10 +1,10 @@
-﻿using Dalamud.Configuration;
+﻿using System;
+using Dalamud.Configuration;
 using Dalamud.Game.ClientState.Keys;
 using Dalamud.Plugin;
 using NLog;
 using SmartPings.Audio;
 using SmartPings.Data;
-using System;
 
 namespace SmartPings
 {
@@ -21,9 +21,15 @@ namespace SmartPings
 
         public int SelectedAudioOutputDeviceIndex { get; set; } = -1;
 
+        /// <summary>
+        /// Backwards-compatible name for TogglePing
+        /// </summary>
         public VirtualKey PingKeybind { get; set; } = VirtualKey.G;
+        /// <summary>
+        /// Backwards-compatible name for HoldPing
+        /// </summary>
         public VirtualKey QuickPingKeybind { get; set; } = VirtualKey.CONTROL;
-        public VirtualKey QuickerPingKeybind { get; set; } = VirtualKey.MBUTTON;
+        public VirtualKey TapPingKeybind { get; set; } = VirtualKey.NO_KEY;
 
         public bool EnableGroundPings { get; set; } = true;
         public bool EnablePingWheel { get; set; } = true;

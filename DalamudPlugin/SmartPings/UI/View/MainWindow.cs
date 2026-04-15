@@ -463,12 +463,12 @@ public sealed class MainWindow : Window, IPluginUIView, IDisposable
 
         using (ImRaii.PushIndent())
         {
-            DrawKeybindEdit(Keybind.Ping, this.configuration.PingKeybind, "Ping Keybind",
+            DrawKeybindEdit(Keybind.TogglePing, this.configuration.PingKeybind, "Toggle Ping Keybind",
                 "Pressing this keybind will make the next left click execute a ping.");
-            DrawKeybindEdit(Keybind.QuickPing, this.configuration.QuickPingKeybind, "Quick Ping Keybind",
+            DrawKeybindEdit(Keybind.HoldPing, this.configuration.QuickPingKeybind, "Hold Ping Keybind",
                 "Lefting clicking while holding this keybind will execute a ping.");
-            DrawKeybindEdit(Keybind.QuickerPing, this.configuration.QuickerPingKeybind, "Quicker Ping Keybind",
-                "Clicking keybind will execute a ping.");
+            DrawKeybindEdit(Keybind.TapPing, this.configuration.TapPingKeybind, "Tap Ping Keybind",
+                "Pressing this keybind will execute a ping.");
         }
 
         ImGui.Dummy(new Vector2(0.0f, 5.0f)); // ---------------

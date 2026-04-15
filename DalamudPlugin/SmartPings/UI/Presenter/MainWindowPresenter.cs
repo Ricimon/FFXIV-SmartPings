@@ -154,12 +154,12 @@ public class MainWindowPresenter(
         {
             switch (k)
             {
-                case Keybind.Ping:
+                case Keybind.TogglePing:
                     configuration.PingKeybind = default; break;
-                case Keybind.QuickPing:
+                case Keybind.HoldPing:
                     configuration.QuickPingKeybind = default; break;
-                case Keybind.QuickerPing:
-                    configuration.QuickerPingKeybind = default; break;
+                case Keybind.TapPing:
+                    configuration.TapPingKeybind = default; break;
                 default:
                     return;
             }
@@ -261,7 +261,7 @@ public class MainWindowPresenter(
 
     private void OnKeyDown(VirtualKey key)
     {
-        // Disallow any keybinds to left mouse and right mouse (allow other mouse buttons for quicker ping)
+        // Disallow any keybinds to left mouse and right mouse
         if (key == VirtualKey.LBUTTON || key == VirtualKey.RBUTTON) { return; }
 
         // This callback can be called from a non-framework thread, and UI values should only be modified
@@ -271,14 +271,19 @@ public class MainWindowPresenter(
             var editedKeybind = view.KeybindBeingEdited.Value;
             view.KeybindBeingEdited.Value = Keybind.None;
 
+            if (key == VirtualKey.ESCAPE)
+            {
+                key = VirtualKey.NO_KEY;
+            }
+
             switch (editedKeybind)
             {
-                case Keybind.Ping:
+                case Keybind.TogglePing:
                     configuration.PingKeybind = key; break;
-                case Keybind.QuickPing:
+                case Keybind.HoldPing:
                     configuration.QuickPingKeybind = key; break;
-                case Keybind.QuickerPing:
-                    configuration.QuickerPingKeybind = key; break;
+                case Keybind.TapPing:
+                    configuration.TapPingKeybind = key; break;
                 default:
                     return;
             }
@@ -288,25 +293,11 @@ public class MainWindowPresenter(
 
     private void OnInputKeyDown(WindowsInput.Events.KeyDown args)
     {
-        // Only handle mouse buttons through this method, but exclude right mouse button
-        if (args.Key != WindowsInput.Events.KeyCode.MButton &&
-            args.Key != WindowsInput.Events.KeyCode.XButton1 &&
-            args.Key != WindowsInput.Events.KeyCode.XButton2)
+        // Only handle mouse buttons through this method
+        if (args.Key.IsMouseButton())
         {
-            return;
+            OnKeyDown(args.Key.ToVirtualKey());
         }
-
-        // Convert to VirtualKey
-        var virtualKey = args.Key switch
-        {
-            WindowsInput.Events.KeyCode.MButton => VirtualKey.MBUTTON,
-            WindowsInput.Events.KeyCode.XButton1 => VirtualKey.XBUTTON1,
-            WindowsInput.Events.KeyCode.XButton2 => VirtualKey.XBUTTON2,
-            _ => default(VirtualKey)
-        };
-
-        // Call the same handling logic
-        OnKeyDown(virtualKey);
     }
 
 }
