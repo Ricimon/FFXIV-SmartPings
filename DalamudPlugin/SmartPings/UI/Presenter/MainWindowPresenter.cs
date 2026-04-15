@@ -23,6 +23,7 @@ public class MainWindowPresenter(
     IAudioDeviceController audioDeviceController,
     ServerConnection serverConnection,
     KeyStateWrapper keyStateWrapper,
+    InputEventSource inputEventSource,
     XivHudNodeMap hudNodeMap,
     ILogger logger) : IPluginUIPresenter
 {
@@ -138,11 +139,14 @@ public class MainWindowPresenter(
             if (k != Keybind.None && !this.keyDownListenerSubscribed)
             {
                 keyStateWrapper.OnKeyDown += OnKeyDown;
+                // Also subscribe to input event source for mouse buttons
+                inputEventSource.SubscribeToKeyDown(OnInputKeyDown);
                 this.keyDownListenerSubscribed = true;
             }
             else if (k == Keybind.None && this.keyDownListenerSubscribed)
             {
                 keyStateWrapper.OnKeyDown -= OnKeyDown;
+                inputEventSource.UnsubscribeToKeyDown(OnInputKeyDown);
                 this.keyDownListenerSubscribed = false;
             }
         });
@@ -154,6 +158,8 @@ public class MainWindowPresenter(
                     configuration.PingKeybind = default; break;
                 case Keybind.QuickPing:
                     configuration.QuickPingKeybind = default; break;
+                case Keybind.QuickerPing:
+                    configuration.QuickerPingKeybind = default; break;
                 default:
                     return;
             }
@@ -255,8 +261,8 @@ public class MainWindowPresenter(
 
     private void OnKeyDown(VirtualKey key)
     {
-        // Disallow any keybinds to left mouse
-        if (key == VirtualKey.LBUTTON) { return; }
+        // Disallow any keybinds to left mouse and right mouse (allow other mouse buttons for quicker ping)
+        if (key == VirtualKey.LBUTTON || key == VirtualKey.RBUTTON) { return; }
 
         // This callback can be called from a non-framework thread, and UI values should only be modified
         // on the framework thread (or else the game can crash)
@@ -271,11 +277,36 @@ public class MainWindowPresenter(
                     configuration.PingKeybind = key; break;
                 case Keybind.QuickPing:
                     configuration.QuickPingKeybind = key; break;
+                case Keybind.QuickerPing:
+                    configuration.QuickerPingKeybind = key; break;
                 default:
                     return;
             }
             configuration.Save();
         });
+    }
+
+    private void OnInputKeyDown(WindowsInput.Events.KeyDown args)
+    {
+        // Only handle mouse buttons through this method, but exclude right mouse button
+        if (args.Key != WindowsInput.Events.KeyCode.MButton &&
+            args.Key != WindowsInput.Events.KeyCode.XButton1 &&
+            args.Key != WindowsInput.Events.KeyCode.XButton2)
+        {
+            return;
+        }
+
+        // Convert to VirtualKey
+        var virtualKey = args.Key switch
+        {
+            WindowsInput.Events.KeyCode.MButton => VirtualKey.MBUTTON,
+            WindowsInput.Events.KeyCode.XButton1 => VirtualKey.XBUTTON1,
+            WindowsInput.Events.KeyCode.XButton2 => VirtualKey.XBUTTON2,
+            _ => default(VirtualKey)
+        };
+
+        // Call the same handling logic
+        OnKeyDown(virtualKey);
     }
 
 }
