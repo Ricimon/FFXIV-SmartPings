@@ -452,7 +452,7 @@ public unsafe class GuiPingHandler(
 
             case XivHudNodeMap.HudSection.TargetHp:
                 {
-                    var targetId = AgentHUD.Instance()->CurrentTargetId;
+                    var targetId = AgentHUD.Instance()->CurrentTargetId.ObjectId;
                     var target = CharacterManager.Instance()->LookupBattleCharaByEntityId(targetId);
                     if (target != null)
                     {
@@ -471,7 +471,7 @@ public unsafe class GuiPingHandler(
             case XivHudNodeMap.HudSection.TargetStatus1:
             case XivHudNodeMap.HudSection.TargetStatus2:
                 {
-                    var targetId = AgentHUD.Instance()->CurrentTargetId;
+                    var targetId = AgentHUD.Instance()->CurrentTargetId.ObjectId;
                     var target = CharacterManager.Instance()->LookupBattleCharaByEntityId(targetId);
                     if (target != null)
                     {

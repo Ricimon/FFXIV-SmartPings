@@ -217,7 +217,7 @@ public class MainWindowPresenter(
         {
             unsafe
             {
-                var targetId = AgentHUD.Instance()->CurrentTargetId;
+                var targetId = AgentHUD.Instance()->CurrentTargetId.ObjectId;
                 var target = CharacterManager.Instance()->LookupBattleCharaByEntityId(targetId);
                 if (target != null)
                 {
