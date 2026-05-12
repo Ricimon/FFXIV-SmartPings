@@ -391,6 +391,7 @@ public sealed class ServerConnection : IDisposable
                 Y = payload.worldPositionY,
                 Z = payload.worldPositionZ,
             },
+            TimestampReceived = DateTime.UtcNow,
         };
         BinaryPrimitives.TryReadUInt64BigEndian(payload.authorId, out ping.AuthorId);
         BinaryPrimitives.TryReadInt64BigEndian(payload.startTimestamp, out ping.StartTimestamp);

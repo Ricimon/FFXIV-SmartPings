@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System;
+using System.Numerics;
 
 namespace SmartPings;
 
@@ -20,6 +21,7 @@ public class GroundPing
     public ulong AuthorId;
     public string? MapId;
     public Vector3 WorldPosition;
+    public DateTime TimestampReceived;
     public float DrawDuration;
 
     public int SfxId;

@@ -58,6 +58,7 @@ public class GroundPingView : IPluginUIView
     private const float LEFT_CLICK_HOLD_DURATION_FOR_PING_WHEEL = 0.4f;
     private const float PING_WHEEL_SIZE = 310;
     private const float PING_WHEEL_CENTER_SIZE_MULTIPLIER = 0.141f;
+    private const float PING_DRAW_TIMEOUT = 5.0f;
 
     private bool IsHoldPingKeybindDown => this.keyStateWrapper.IsVirtualKeyValid(this.configuration.QuickPingKeybind) &&
         this.keyStateWrapper.GetRawValue(this.configuration.QuickPingKeybind) > 0;
@@ -297,6 +298,7 @@ public class GroundPingView : IPluginUIView
                                 AuthorId = this.dalamud.PlayerState.ContentId,
                                 MapId = this.mapManager.GetCurrentMapPublicRoomName(),
                                 WorldPosition = worldPos,
+                                TimestampReceived = DateTime.UtcNow,
                             };
                             this.addGroundPing.OnNext(ping);
                         }
@@ -388,12 +390,28 @@ public class GroundPingView : IPluginUIView
 
         nearPlane = new(View.M13, View.M23, View.M33, View.M43 + renderCamera->NearPlane);
 
+        var now = DateTime.UtcNow;
+
         var mapId = this.mapManager.GetCurrentMapPublicRoomName();
         var pNode = this.presenter.Value.GroundPings.First;
         while (pNode != null)
         {
             var p = pNode.Value;
             var nextNode = pNode.Next;
+
+            // Ping is too old
+            if (now - p.TimestampReceived > TimeSpan.FromSeconds(PING_DRAW_TIMEOUT))
+            {
+                // Hasn't drawn yet, or has already played its sound effect
+                // The case we want to avoid is removing the ping before the animation has finished playing
+                if (p.DrawDuration == 0 ||
+                    p.SfxId != default)
+                {
+                    this.presenter.Value.GroundPings.Remove(pNode);
+                    pNode = nextNode;
+                    continue;
+                }
+            }
 
             if (mapId != p.MapId)
             {
@@ -436,7 +454,7 @@ public class GroundPingView : IPluginUIView
             p.DrawDuration += ImGui.GetIO().DeltaTime;
 
             // Extra cleanup
-            if (p.DrawDuration > 10)
+            if (p.DrawDuration > PING_DRAW_TIMEOUT)
             {
                 this.presenter.Value.GroundPings.Remove(pNode);
                 pNode = nextNode;
