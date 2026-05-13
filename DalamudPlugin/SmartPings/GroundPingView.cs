@@ -313,6 +313,13 @@ public class GroundPingView : IPluginUIView
             else
             {
                 this.presenter.Value.GroundPings.Clear();
+                // Clear any in-progress ping state so it can't carry over to the character
+                // select screen and cause SetNextFrameWantCaptureMouse to run every frame.
+                pingScreenPosition = null;
+                pingInput = null;
+                pingInputHeldDuration = 0;
+                pingWheelActive = false;
+                cursorIsPing = false;
             }
 
             unsafe
@@ -339,6 +346,10 @@ public class GroundPingView : IPluginUIView
 
     private bool IsAnyPingEnabled()
     {
+        if (!this.dalamud.PlayerState.IsLoaded)
+        {
+            return false;
+        }
         if (this.configuration.OnlyEnableInCombat && !this.dalamud.Condition.Any(ConditionFlag.InCombat))
         {
             return false;

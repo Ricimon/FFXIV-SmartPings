@@ -114,6 +114,7 @@ public sealed class InputEventSource : IDisposable
 
     private void OnMouseButtonDown(object? o, EventSourceEventArgs<ButtonDown> e)
     {
+        if (!IsGameFocused()) return;
         KeyCode keyCode;
         switch(e.Data.Button)
         {
@@ -140,6 +141,7 @@ public sealed class InputEventSource : IDisposable
     private void OnMouseButtonUp(object? o, EventSourceEventArgs<ButtonUp> e)
     {
         // Always listen to key ups, since these are necessary to cancel hold actions
+        if (!IsGameFocused()) return;
         KeyCode keyCode;
         switch(e.Data.Button)
         {
