@@ -52,6 +52,7 @@ Currently supported UI pings:
 - Own statuses
 - Party list statuses
 - Party list HP/MP
+- Party list castbar
 - Target statuses
 - Target HP
 
