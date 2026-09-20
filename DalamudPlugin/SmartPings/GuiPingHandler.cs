@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Text;
+using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Utility;
 using ECommons.Automation;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
@@ -109,97 +111,122 @@ public unsafe class GuiPingHandler(
             chatMsg?.Append($"{info.OwnerName}: ");
         }
 
-        if (info.ElementType == HudElementInfo.Type.Status)
+        switch (info.ElementType)
         {
-            var isRealStatus = info.Status.Id > 0;
+            case HudElementInfo.Type.Status:
+                var isRealStatus = info.Status.Id > 0;
 
-            // Status name --------------
-            if (isRealStatus)
-            {
-                echoMsg?.AddStatusLink(info.Status.Id);
-                // This is how status links are normally constructed
-                echoMsg?.AddUiForeground(500);
-                echoMsg?.AddUiGlow(501);
-                echoMsg?.Append(SeIconChar.LinkMarker.ToIconString());
-                echoMsg?.AddUiGlowOff();
-                echoMsg?.AddUiForegroundOff();
-            }
-            if (info.Status.IsEnfeeblement)
-            {
-                echoMsg?.AddUiForeground(518);
-                echoMsg?.Append(SeIconChar.Debuff.ToIconString());
-                echoMsg?.AddUiForegroundOff();
-            }
-            else
-            {
-                echoMsg?.AddUiForeground(517);
-                echoMsg?.Append(SeIconChar.Buff.ToIconString());
-                echoMsg?.AddUiForegroundOff();
-            }
-            var beneficial = info.IsOnHostile == info.Status.IsEnfeeblement;
-            echoMsg?.AddUiForeground($"{info.Status.Name}", beneficial ? YELLOW : RED);
-            if (isRealStatus) { echoMsg?.Append([RawPayload.LinkTerminator]); }
+                // Status name --------------
+                if (isRealStatus)
+                {
+                    echoMsg?.AddStatusLink(info.Status.Id);
+                    // This is how status links are normally constructed
+                    echoMsg?.AddUiForeground(500);
+                    echoMsg?.AddUiGlow(501);
+                    echoMsg?.Append(SeIconChar.LinkMarker.ToIconString());
+                    echoMsg?.AddUiGlowOff();
+                    echoMsg?.AddUiForegroundOff();
+                }
+                if (info.Status.IsEnfeeblement)
+                {
+                    echoMsg?.AddUiForeground(518);
+                    echoMsg?.Append(SeIconChar.Debuff.ToIconString());
+                    echoMsg?.AddUiForegroundOff();
+                }
+                else
+                {
+                    echoMsg?.AddUiForeground(517);
+                    echoMsg?.Append(SeIconChar.Buff.ToIconString());
+                    echoMsg?.AddUiForegroundOff();
+                }
+                var beneficial = info.IsOnHostile == info.Status.IsEnfeeblement;
+                echoMsg?.AddUiForeground($"{info.Status.Name}", beneficial ? YELLOW : RED);
+                if (isRealStatus) { echoMsg?.Append([RawPayload.LinkTerminator]); }
 
-            chatMsg?.Append(isRealStatus ? "<status>" : info.Status.Name);
+                chatMsg?.Append(isRealStatus ? "<status>" : info.Status.Name);
 
-            if (info.Status.MaxStacks > 0)
-            {
-                echoMsg?.AddUiForeground($" x{info.Status.Stacks}", beneficial ? YELLOW : RED);
+                if (info.Status.MaxStacks > 0)
+                {
+                    echoMsg?.AddUiForeground($" x{info.Status.Stacks}", beneficial ? YELLOW : RED);
 
-                chatMsg?.Append($" x{info.Status.Stacks}");
-            }
+                    chatMsg?.Append($" x{info.Status.Stacks}");
+                }
 
-            // Timer ---------------
-            if (info.Status.RemainingTime > 0)
-            {
-                echoMsg?.AddUiForeground(" - ", YELLOW);
-                var remainingTime = info.Status.RemainingTime >= 1 ?
-                    MathF.Floor(info.Status.RemainingTime).ToString() :
-                    info.Status.RemainingTime.ToString("F1");
-                echoMsg?.AddUiForeground($"{remainingTime}s", GREEN);
+                // Timer ---------------
+                if (info.Status.RemainingTime > 0)
+                {
+                    echoMsg?.AddUiForeground(" - ", YELLOW);
+                    var remainingTime = info.Status.RemainingTime >= 1 ?
+                        MathF.Floor(info.Status.RemainingTime).ToString() :
+                        info.Status.RemainingTime.ToString("F1");
+                    echoMsg?.AddUiForeground($"{remainingTime}s", GREEN);
 
-                chatMsg?.Append($" - {remainingTime}s");
-            }
-        }
-        else if (info.ElementType == HudElementInfo.Type.Hp)
-        {
-            var hpPercent = (float)info.Hp.Value / info.Hp.MaxValue * 100;
-            hpPercent = MathF.Floor(hpPercent * 10) / 10;
-            var hpString = hpPercent == 100 ? hpPercent.ToString("F0") : hpPercent.ToString("F1");
-            if (hpString == "0.0" && hpPercent > 0) { hpString = "0.1"; }
-            echoMsg?.AddUiForeground($"HP: {hpString}%", hpPercent < 10 ? RED : YELLOW);
-            if (info.IsOnPartyMember || info.IsOnSelf)
-            {
-                echoMsg?.AddUiForeground($" ({info.Hp.Value:N0}/{info.Hp.MaxValue:N0})", GREEN);
-            }
+                    chatMsg?.Append($" - {remainingTime}s");
+                }
+                break;
 
-            chatMsg?.Append($"HP: {hpString}%");
-            if (info.IsOnPartyMember || info.IsOnSelf)
-            {
-                chatMsg?.Append($" ({info.Hp.Value:N0}/{info.Hp.MaxValue:N0})");
-            }
-        }
-        else if (info.ElementType == HudElementInfo.Type.Mp)
-        {
-            var mpPercent = (float)info.Mp.Value / info.Mp.MaxValue * 100;
-            mpPercent = MathF.Floor(mpPercent * 10) / 10;
-            var mpString = mpPercent == 100 ? mpPercent.ToString("F0") : mpPercent.ToString("F1");
-            if (mpString == "0.0" && mpPercent > 0) { mpString = "0.1"; }
-            echoMsg?.AddUiForeground($"MP: {mpString}%", mpPercent < 10 ? RED : YELLOW);
-            if (info.IsOnPartyMember || info.IsOnSelf)
-            {
-                echoMsg?.AddUiForeground($" ({info.Mp.Value:N0}/{info.Mp.MaxValue:N0})", GREEN);
-            }
+            case HudElementInfo.Type.Hp:
+                var hpPercent = (float)info.Hp.Value / info.Hp.MaxValue * 100;
+                hpPercent = MathF.Floor(hpPercent * 10) / 10;
+                var hpString = hpPercent == 100 ? hpPercent.ToString("F0") : hpPercent.ToString("F1");
+                if (hpString == "0.0" && hpPercent > 0) { hpString = "0.1"; }
+                echoMsg?.AddUiForeground($"HP: {hpString}%", hpPercent < 10 ? RED : YELLOW);
+                if (info.IsOnPartyMember || info.IsOnSelf)
+                {
+                    echoMsg?.AddUiForeground($" ({info.Hp.Value:N0}/{info.Hp.MaxValue:N0})", GREEN);
+                }
 
-            chatMsg?.Append($"MP: {mpString}%");
-            if (info.IsOnPartyMember || info.IsOnSelf)
-            {
-                chatMsg?.Append($" ({info.Mp.Value:N0}/{info.Mp.MaxValue:N0})");
-            }
-        }
-        else
-        {
-            return new(null, null);
+                chatMsg?.Append($"HP: {hpString}%");
+                if (info.IsOnPartyMember || info.IsOnSelf)
+                {
+                    chatMsg?.Append($" ({info.Hp.Value:N0}/{info.Hp.MaxValue:N0})");
+                }
+                break;
+
+            case HudElementInfo.Type.Mp:
+                var mpPercent = (float)info.Mp.Value / info.Mp.MaxValue * 100;
+                mpPercent = MathF.Floor(mpPercent * 10) / 10;
+                var mpString = mpPercent == 100 ? mpPercent.ToString("F0") : mpPercent.ToString("F1");
+                if (mpString == "0.0" && mpPercent > 0) { mpString = "0.1"; }
+                echoMsg?.AddUiForeground($"MP: {mpString}%", mpPercent < 10 ? RED : YELLOW);
+                if (info.IsOnPartyMember || info.IsOnSelf)
+                {
+                    echoMsg?.AddUiForeground($" ({info.Mp.Value:N0}/{info.Mp.MaxValue:N0})", GREEN);
+                }
+
+                chatMsg?.Append($"MP: {mpString}%");
+                if (info.IsOnPartyMember || info.IsOnSelf)
+                {
+                    chatMsg?.Append($" ({info.Mp.Value:N0}/{info.Mp.MaxValue:N0})");
+                }
+                break;
+
+            case HudElementInfo.Type.Castbar:
+                echoMsg?.AddUiForeground("casting ", LIGHT_BLUE);
+                echoMsg?.AddUiForeground(info.CastbarName, YELLOW);
+
+                chatMsg?.Append($"casting {info.CastbarName}");
+
+                if (info.TargetName != null)
+                {
+                    if (info.IsTargetSelf)
+                    {
+                        echoMsg?.AddUiForeground(" on self", LIGHT_BLUE);
+
+                        chatMsg?.Append(" on self");
+                    }
+                    else
+                    {
+                        echoMsg?.AddUiForeground(" on ", LIGHT_BLUE);
+                        echoMsg?.AddUiForeground(info.TargetName, info.IsTargetHostile ? RED : LIGHT_BLUE);
+
+                        chatMsg?.Append($" on {info.TargetName}");
+                    }
+                }
+                break;
+
+            default:
+                return new(null, null);
         }
 
         return new(echoMsg, chatMsg);
@@ -229,7 +256,8 @@ public unsafe class GuiPingHandler(
             };
 
             if (info.ElementType == HudElementInfo.Type.Hp ||
-                info.ElementType == HudElementInfo.Type.Mp)
+                info.ElementType == HudElementInfo.Type.Mp ||
+                info.ElementType == HudElementInfo.Type.Castbar)
             {
                 ImGuiExtensions.CaptureMouseThisFrame();
             }
@@ -412,7 +440,7 @@ public unsafe class GuiPingHandler(
             case XivHudNodeMap.HudSection.PartyList8CollisionNode:
             case XivHudNodeMap.HudSection.PartyList9CollisionNode:
                 {
-                    if (!configuration.EnableHpMpPings) { break; }
+                    if (!configuration.EnableCastbarPings && !configuration.EnableHpMpPings) { break; }
 
                     var partyMemberIndex = hudElement.HudSection - XivHudNodeMap.HudSection.PartyList1CollisionNode;
                     if (partyMemberIndex < AgentHUD.Instance()->PartyMemberCount)
@@ -420,31 +448,83 @@ public unsafe class GuiPingHandler(
                         var partyMember = AgentHUD.Instance()->PartyMembers[partyMemberIndex];
                         if (partyMember.Object == null) { break; }
                         var mousePosition = new Vector2(UIInputData.Instance()->CursorInputs.PositionX, UIInputData.Instance()->CursorInputs.PositionY);
-                        // Check for HP node
-                        var element = new XivHudNodeMap.HudElement(XivHudNodeMap.HudSection.PartyList1Hp + partyMemberIndex);
-                        if (hudNodeMap.TryGetHudElementNode(element, out var hpNode) &&
-                            IsPositionInNode(mousePosition, (AtkResNode*)hpNode))
+
+                        if (configuration.EnableCastbarPings)
                         {
-                            info.ElementType = HudElementInfo.Type.Hp;
-                            info.OwnerName = partyMember.Name.ExtractText();
-                            info.IsOnSelf = partyMemberIndex == 0;
-                            info.IsOnPartyMember = true;
-                            info.Hp.Value = partyMember.Object->Health;
-                            info.Hp.MaxValue = partyMember.Object->MaxHealth;
-                            return true;
+                            // Check for castbar node
+                            var element = new XivHudNodeMap.HudElement(XivHudNodeMap.HudSection.PartyList1Castbar + partyMemberIndex);
+                            if (hudNodeMap.TryGetHudElementNode(element, out var castbarNode) &&
+                                IsPositionInNode(mousePosition, (AtkResNode*)castbarNode))
+                            {
+                                var node = (AtkResNode*)castbarNode;
+                                var castbarBackgroundNode = node->ChildNode;
+                                if (castbarBackgroundNode != null && castbarBackgroundNode->IsVisible())
+                                {
+                                    info.ElementType = HudElementInfo.Type.Castbar;
+                                    info.OwnerName = partyMember.Name.ExtractText();
+                                    info.IsOnSelf = partyMemberIndex == 0;
+                                    info.IsOnPartyMember = true;
+
+                                    var castInfo = partyMember.Object->GetCastInfo();
+                                    if (castInfo == null) { break; }
+
+                                    var luminaActions = dalamud.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Action>(dalamud.ClientState.ClientLanguage);
+                                    if (!luminaActions.TryGetRow(castInfo->ActionId, out var luminaAction)) { break; }
+                                    info.CastbarName = luminaAction.Name.ToString();
+                                    if (!luminaAction.CanTargetAlly && !luminaAction.CanTargetHostile)
+                                    {
+                                        return true;
+                                    }
+
+                                    var targetId = castInfo->TargetId.Id;
+                                    IGameObject? targetGo = null;
+                                    dalamud.Framework.Run(() =>
+                                    {
+                                        targetGo = dalamud.ObjectTable.SearchById(targetId);
+                                    }).WaitSafely();
+                                    if (targetGo != null)
+                                    {
+                                        info.TargetName = targetGo.Name.TextValue;
+                                        info.IsTargetSelf = targetGo.EntityId == partyMember.EntityId;
+                                        var targetData = (GameObject*)targetGo.Address;
+                                        if (targetData != null)
+                                        {
+                                            info.IsTargetHostile = (*targetData).IsHostile();
+                                        }
+                                    }
+                                    return true;
+                                }
+                            }
                         }
-                        // Check for MP node
-                        element = new XivHudNodeMap.HudElement(XivHudNodeMap.HudSection.PartyList1Mp + partyMemberIndex);
-                        if (hudNodeMap.TryGetHudElementNode(element, out var mpNode) &&
-                            IsPositionInNode(mousePosition, (AtkResNode*)mpNode))
+
+                        if (configuration.EnableHpMpPings)
                         {
-                            info.ElementType = HudElementInfo.Type.Mp;
-                            info.OwnerName = partyMember.Name.ExtractText();
-                            info.IsOnSelf = partyMemberIndex == 0;
-                            info.IsOnPartyMember = true;
-                            info.Mp.Value = partyMember.Object->Mana;
-                            info.Mp.MaxValue = partyMember.Object->MaxMana;
-                            return true;
+                            // Check for HP node
+                            var element = new XivHudNodeMap.HudElement(XivHudNodeMap.HudSection.PartyList1Hp + partyMemberIndex);
+                            if (hudNodeMap.TryGetHudElementNode(element, out var hpNode) &&
+                                IsPositionInNode(mousePosition, (AtkResNode*)hpNode))
+                            {
+                                info.ElementType = HudElementInfo.Type.Hp;
+                                info.OwnerName = partyMember.Name.ExtractText();
+                                info.IsOnSelf = partyMemberIndex == 0;
+                                info.IsOnPartyMember = true;
+                                info.Hp.Value = partyMember.Object->Health;
+                                info.Hp.MaxValue = partyMember.Object->MaxHealth;
+                                return true;
+                            }
+                            // Check for MP node
+                            element = new XivHudNodeMap.HudElement(XivHudNodeMap.HudSection.PartyList1Mp + partyMemberIndex);
+                            if (hudNodeMap.TryGetHudElementNode(element, out var mpNode) &&
+                                IsPositionInNode(mousePosition, (AtkResNode*)mpNode))
+                            {
+                                info.ElementType = HudElementInfo.Type.Mp;
+                                info.OwnerName = partyMember.Name.ExtractText();
+                                info.IsOnSelf = partyMemberIndex == 0;
+                                info.IsOnPartyMember = true;
+                                info.Mp.Value = partyMember.Object->Mana;
+                                info.Mp.MaxValue = partyMember.Object->MaxMana;
+                                return true;
+                            }
                         }
                     }
                 }
@@ -460,7 +540,7 @@ public unsafe class GuiPingHandler(
                         info.OwnerName = target->NameString;
                         info.IsOnSelf = targetId == GetLocalPlayerId();
                         info.IsOnPartyMember = target->IsPartyMember;
-                        info.IsOnHostile = target->IsHostile;
+                        info.IsOnHostile = (*target).IsHostile();
                         info.Hp.Value = target->Health;
                         info.Hp.MaxValue = target->MaxHealth;
                         return true;
@@ -482,7 +562,7 @@ public unsafe class GuiPingHandler(
                             info.OwnerName = target->NameString;
                             info.IsOnSelf = targetId == GetLocalPlayerId();
                             info.IsOnPartyMember = target->IsPartyMember;
-                            info.IsOnHostile = target->IsHostile;
+                            info.IsOnHostile = (*target).IsHostile();
                             return true;
                         }
                     }

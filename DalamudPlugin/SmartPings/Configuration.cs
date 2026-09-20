@@ -37,6 +37,7 @@ namespace SmartPings
 
         public bool EnableGuiPings { get; set; } = true;
         public bool EnableHpMpPings { get; set; } = true;
+        public bool EnableCastbarPings { get; set; } = true;
         public bool SendGuiPingsToCustomServer { get; set; } = true;
         public bool SendGuiPingsToXivChat { get; set; }
         public XivChatSendLocation XivChatSendLocation { get; set; } = XivChatSendLocation.Active;

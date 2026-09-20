@@ -54,6 +54,7 @@ public sealed class MainWindow : Window, IPluginUIView, IDisposable
     public IReactiveProperty<GroundPing.Type> DefaultGroundPingType { get; } = new ReactiveProperty<GroundPing.Type>();
     public IReactiveProperty<bool> EnableGuiPings { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<bool> EnableHpMpPings { get; } = new ReactiveProperty<bool>();
+    public IReactiveProperty<bool> EnableCastbarPings { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<bool> SendGuiPingsToCustomServer { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<bool> SendGuiPingsToXivChat { get; } = new ReactiveProperty<bool>();
     public IReactiveProperty<XivChatSendLocation> XivChatSendLocation { get; } = new ReactiveProperty<XivChatSendLocation>();
@@ -510,13 +511,24 @@ public sealed class MainWindow : Window, IPluginUIView, IDisposable
         using (ImRaii.Disabled(!this.EnableGuiPings.Value))
         {
             var enableHpMpPings = this.EnableHpMpPings.Value;
-            if (ImGui.Checkbox("Enable HP/MP Pings", ref enableHpMpPings))
+            if (ImGui.Checkbox("Enable HP/MP pings", ref enableHpMpPings))
             {
                 this.EnableHpMpPings.Value = enableHpMpPings;
             }
             if (ImGui.IsItemHovered())
             {
                 ImGui.SetTooltip("Mouse input will be blocked if pinging HP/MP values, so disable this if this is not desired.");
+            }
+            ImGui.SameLine(); Common.HelpMarker("Only works on party list");
+
+            var enableCastbarPings = this.EnableCastbarPings.Value;
+            if (ImGui.Checkbox("Enable castbar pings", ref enableCastbarPings))
+            {
+                this.EnableCastbarPings.Value = enableCastbarPings;
+            }
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip("Mouse input will be blocked if pinging castbars, so disable this if this is not desired.");
             }
             ImGui.SameLine(); Common.HelpMarker("Only works on party list");
 

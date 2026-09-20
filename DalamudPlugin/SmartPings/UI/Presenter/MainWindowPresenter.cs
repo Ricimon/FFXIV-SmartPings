@@ -80,6 +80,8 @@ public class MainWindowPresenter(
             b => { configuration.EnableGuiPings = b; configuration.Save(); }, configuration.EnableGuiPings);
         Bind(view.EnableHpMpPings,
             b => { configuration.EnableHpMpPings = b; configuration.Save(); }, configuration.EnableHpMpPings);
+        Bind(view.EnableCastbarPings,
+            b => { configuration.EnableCastbarPings = b; configuration.Save(); }, configuration.EnableCastbarPings);
         Bind(view.SendGuiPingsToCustomServer,
             b => { configuration.SendGuiPingsToCustomServer = b; configuration.Save(); }, configuration.SendGuiPingsToCustomServer);
         Bind(view.SendGuiPingsToXivChat,

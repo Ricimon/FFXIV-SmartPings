@@ -2,6 +2,7 @@
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -52,5 +53,34 @@ public static class DalamudExtensions
     {
         var resourcesDir = Path.Combine(pluginInterface.AssemblyLocation.Directory?.FullName!, "Resources");
         return Path.Combine(resourcesDir, fileName);
+    }
+
+    /// <summary>
+    /// A different method to check for hostile status using nameplate color type
+    /// </summary>
+    public static bool IsHostile(this ref GameObject gameObject)
+    {
+        var plateType = gameObject.GetNamePlateColorType();
+
+        // 4, 5, 6: Enemy players in PvP
+        // 7: yellow, can be attacked, not engaged
+        // 8: dead
+        // 9: red, engaged with your party
+        // 10: purple, engaged with other party
+        // 11: orange, aggro'd to your party but not attacked yet
+        return plateType >= 4 && plateType <= 11;
+    }
+
+    /// <summary>
+    /// A different method to check for hostile status using nameplate color type
+    /// </summary>
+    public static unsafe bool IsHostile(this ref BattleChara battleChara)
+    {
+        fixed (BattleChara* bc = &battleChara)
+        {
+            var gameObject = (GameObject*)bc;
+            if (gameObject == null) { return false; }
+            return (*gameObject).IsHostile();
+        }
     }
 }

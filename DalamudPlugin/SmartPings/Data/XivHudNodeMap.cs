@@ -64,6 +64,16 @@ public unsafe sealed class XivHudNodeMap : IDisposable
         PartyList7Mp = 57,
         PartyList8Mp = 58,
         PartyList9Mp = 59,
+
+        PartyList1Castbar = 61,
+        PartyList2Castbar = 62,
+        PartyList3Castbar = 63,
+        PartyList4Castbar = 64,
+        PartyList5Castbar = 65,
+        PartyList6Castbar = 66,
+        PartyList7Castbar = 67,
+        PartyList8Castbar = 68,
+        PartyList9Castbar = 69,
     }
 
     public struct HudElement(HudSection hudSection, uint index = default)
@@ -239,6 +249,10 @@ public unsafe sealed class XivHudNodeMap : IDisposable
             if (partyMember.MPGaugeBar != null && partyMember.MPGaugeBar->OwnerNode != null)
             {
                 this.elementNodeMap[new(HudSection.PartyList1Mp + i)] = (nint)partyMember.MPGaugeBar->OwnerNode;
+            }
+            if (partyMember.CastingProgressBarBackground != null && partyMember.CastingProgressBarBackground->ParentNode != null)
+            {
+                this.elementNodeMap[new(HudSection.PartyList1Castbar + i)] = (nint)partyMember.CastingProgressBarBackground->ParentNode;
             }
         }
 

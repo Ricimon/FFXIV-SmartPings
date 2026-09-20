@@ -128,7 +128,7 @@ public class GroundPingView : IPluginUIView
 
             if (key == this.configuration.TapPingKeybind)
             {
-                StartPing(key);
+                StartPing(key, false);
                 if (this.configuration.PingKeybindBlocksGameInput)
                 {
                     this.dalamud.KeyState[key] = false;
@@ -174,7 +174,7 @@ public class GroundPingView : IPluginUIView
 
             if (args.Key.ToVirtualKey() == this.configuration.TapPingKeybind)
             {
-                StartPing(args.Key.ToVirtualKey());
+                StartPing(args.Key.ToVirtualKey(), false);
                 if (this.configuration.PingKeybindBlocksGameInput)
                 {
                     Extensions.ImGuiExtensions.CaptureMouseThisFrame();
@@ -182,8 +182,11 @@ public class GroundPingView : IPluginUIView
             }
             else if (args.Key == KeyCode.LButton && (IsHoldPingKeybindDown || cursorIsPing))
             {
-                StartPing(KeyCode.LButton.ToVirtualKey());
-                Extensions.ImGuiExtensions.CaptureMouseThisFrame();
+                StartPing(KeyCode.LButton.ToVirtualKey(), true);
+                if (this.configuration.PingKeybindBlocksGameInput)
+                {
+                    Extensions.ImGuiExtensions.CaptureMouseThisFrame();
+                }
             }
             else if (args.Key.ToVirtualKey() == this.configuration.PingKeybind)
             {
@@ -357,7 +360,7 @@ public class GroundPingView : IPluginUIView
         return this.configuration.EnableGroundPings || this.configuration.EnableGuiPings;
     }
 
-    private void StartPing(VirtualKey pingInputKey)
+    private void StartPing(VirtualKey pingInputKey, bool blockMouseInputOnGroundPing)
     {
         if (ImGui.IsWindowHovered(ImGuiHoveredFlags.AnyWindow))
         {
@@ -376,6 +379,10 @@ public class GroundPingView : IPluginUIView
         pingInput = pingInputKey;
         pingInputHeldDuration = 0;
         pingWheelActive = false;
+        if (blockMouseInputOnGroundPing)
+        {
+            Extensions.ImGuiExtensions.CaptureMouseThisFrame();
+        }
     }
 
     private unsafe bool DrawPings()
