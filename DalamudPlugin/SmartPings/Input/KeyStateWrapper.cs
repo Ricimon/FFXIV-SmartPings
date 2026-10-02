@@ -54,9 +54,34 @@ public sealed class KeyStateWrapper : IKeyState, IDisposable
         return this.dalamud.KeyState.IsVirtualKeyValid(vkCode);
     }
 
+    public bool IsExtendedVirtualKeyValid(int vkCode)
+    {
+        return this.dalamud.KeyState.IsExtendedVirtualKeyValid(vkCode);
+    }
+
+    public bool IsExtendedVirtualKeyValid(VirtualKey vkCode)
+    {
+        return this.dalamud.KeyState.IsExtendedVirtualKeyValid(vkCode);
+    }
+
+    public bool TryGetSeVirtualKey(int vkCode, out int seVkCode)
+    {
+        return this.dalamud.KeyState.TryGetSeVirtualKey(vkCode, out seVkCode);
+    }
+
+    public bool TryGetSeVirtualKey(VirtualKey vkCode, out int seVkCode)
+    {
+        return this.dalamud.KeyState.TryGetSeVirtualKey(vkCode, out seVkCode);
+    }
+
     public IEnumerable<VirtualKey> GetValidVirtualKeys()
     {
         return this.dalamud.KeyState.GetValidVirtualKeys();
+    }
+
+    public IEnumerable<VirtualKey> GetExtendedVirtualKeys()
+    {
+        return this.dalamud.KeyState.GetExtendedVirtualKeys();
     }
 
     public void ClearAll()
