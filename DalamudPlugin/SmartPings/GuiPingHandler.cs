@@ -484,12 +484,15 @@ public unsafe class GuiPingHandler(
                                     }).WaitSafely();
                                     if (targetGo != null)
                                     {
-                                        info.TargetName = targetGo.Name.TextValue;
-                                        info.IsTargetSelf = targetGo.EntityId == partyMember.EntityId;
+                                        //info.TargetName = targetGo.Name.TextValue;
+                                        //info.IsTargetSelf = targetGo.EntityId == partyMember.EntityId;
                                         var targetData = (GameObject*)targetGo.Address;
                                         if (targetData != null)
                                         {
                                             info.IsTargetHostile = (*targetData).IsHostile();
+                                            // Workaround for IGameObject property access crash
+                                            info.TargetName = targetData->NameString;
+                                            info.IsTargetSelf = targetData->EntityId == partyMember.EntityId;
                                         }
                                     }
                                     return true;
